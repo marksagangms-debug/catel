@@ -1,0 +1,31 @@
+---
+description: Keep Catel docs accurate when product or code changes
+alwaysApply: true
+---
+
+# Documentation maintenance
+
+This project keeps durable context in `docs/` because chats do not persist across sessions.
+
+## Doc map
+
+- `docs/overview.md` — purpose, features, build/install, layout
+- `docs/design.md` — UI/UX (status item + popover)
+- `docs/architecture.md` — tech stack, auth, APIs, data flow
+- `docs/README.md` — index / quick start
+
+## When to update
+
+After any meaningful change, update the matching doc in the **same task**:
+
+- Status bar copy, spacing, divider, colors, hover/click behavior → `docs/design.md`
+- Popover layout, meters, labels, what `%` means → `docs/design.md`
+- Endpoints, auth files, polling, models, packaging → `docs/architecture.md`
+- Features list, install path, requirements → `docs/overview.md`
+
+## Rules for writing
+
+- Document what the code **actually** does; do not invent APIs or fields
+- Prefer short, concrete bullets over long prose
+- Call out unofficial endpoints and known caveats (especially Cursor Auto vs Other Models)
+- Do not put secrets, tokens, or raw `auth.json` contents into docs

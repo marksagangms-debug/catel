@@ -1,0 +1,19 @@
+# macOS
+.DS_Store
+._*
+.Spotlight-V100
+.Trashes
+
+# Build output (regenerate with `zsh build.sh`)
+.build/
+Catel.app/
+
+# Xcode / SwiftPM leftovers
+*.xcuserstate
+.swiftpm/
+Package.resolved
+
+# Local env / secrets (never commit these)
+.env
+.env.*
+*.pem
