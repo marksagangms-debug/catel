@@ -11,10 +11,10 @@ Lives in the macOS menu bar via a custom `HoverStatusButton` assigned to the
 
 ### Content
 
-The title is built from the two configured slots (default ChatGPT + Cursor):
+The title is built from the three configured slots (default ChatGPT + Cursor + Nous):
 
 ```text
-G{4px}20% | C{4px}13%
+G{4px}20% | C{4px}13% | N{4px}7%
 ```
 
 - Plain text only — **no** left border, **no** colored backgrounds/gradients
@@ -31,7 +31,7 @@ G{4px}20% | C{4px}13%
 | Hover | Show popover after ~120ms (if not pinned) |
 | Leave status item + popover | Close after ~200ms (if not pinned) |
 | Click | Pin open / unpin close |
-| Right-click | Cursor Models / Other Models, Menu bar slot 1, Quit |
+| Right-click | Cursor Models / Other Models, Menu bar slot 1-3 submenus, Quit |
 | Click outside | Close |
 
 Hover tracking is handled by the custom `HoverStatusButton` view assigned to
@@ -40,17 +40,18 @@ recovers from frame-layout events that can omit the initial enter callback.
 
 ## Popover
 
-- Size **300×452**, no system popover animation (`animates = false`)
+- Size **324×452**, no system popover animation (`animates = false`)
 - SwiftUI content hosted in `NSPopover` inside a `PopoverTrackingView` (which reports pointer enter/exit back to the status item controller)
 - Sections stack top to bottom: **Menu bar** picker, ChatGPT, Cursor, Nous, DeepSeek, footer
 - Design tokens live in `CatelToken` (`PopoverView.swift`) — the exact computed styles from the Paper file “Catel”. Keep them in sync when the design changes.
 
 ### Menu bar section
 
-- Header row: `MENU BAR` + `2 slots`
+- Header row: `MENU BAR` + `3 slots`
 - One picker per slot: current provider name + chevron, 30pt field with rounded 7pt border
+- Width math: the three fields need 94pt each (`DeepSeek` at 12pt medium is the widest label at ~59pt, plus 20pt padding, a 6pt minimum gap, and the chevron), so content is 298pt and the popover is 324pt wide. Labels also carry `minimumScaleFactor(0.85)` so a long name scales rather than truncating.
 - Menu offers ChatGPT / Cursor / Nous / DeepSeek / None; the active one is checked
-- `None` is disabled when the other slot is already hidden (the menu bar must never be empty)
+- `None` stays visible but is **disabled (greyed)** when the other two slots are already hidden, so the menu bar can never be empty
 
 ### ChatGPT section
 
@@ -93,7 +94,7 @@ recovers from frame-layout events that can omit the initial enter callback.
 
 ## Design decisions (current)
 
-- The menu bar shows **exactly two slots** so the item stays narrow; slot choice is user-configured rather than fixed
+- The menu bar shows **exactly three slots** so the item stays narrow; slot choice is user-configured rather than fixed. Repeating a provider is not possible: picking one that is slotted elsewhere swaps the two slots.
 - Status bar `C` defaults to **Other Models** (tighter / more actionable), but can switch to **Cursor Models** via the column radio or the right-click menu
 - Popover always shows **both** Cursor buckets; the radio dot marks which one drives `C`
 - Intentionally **not** showing Cursor `$used / $limit` in the popover (that mixed metrics and confused the UI)

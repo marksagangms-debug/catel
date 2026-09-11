@@ -19,7 +19,7 @@ There is no server, database, or cloud backend for this app. It only **reads loc
 App launch
   → UsageMonitor starts (immediate refresh + 60s timer)
   → ChatGPTUsageClient + CursorUsageClient + HermesUsageClient + DeepSeekUsageClient fetch in parallel
-  → Status item title updates (two configured slots)
+  → Status item title updates (three configured slots)
   → Hover/click shows PopoverView bound to UsageMonitor
 ```
 
@@ -106,9 +106,11 @@ Every endpoint used here is **unofficial / undocumented** and can change: ChatGP
 
 ## Menu bar slots
 
-- `UsageMonitor.menuBarSlots` holds exactly two `MenuBarProvider` values in display order, persisted as a `UserDefaults` array under `menuBarSlots` (default `[chatGPT, cursor]`)
+- `UsageMonitor.menuBarSlots` holds exactly `UsageMonitor.menuBarSlotCount` (3) `MenuBarProvider` values in display order, persisted as a `UserDefaults` array under `menuBarSlots` (default `[chatGPT, cursor, hermes]`)
 - `MenuBarProvider`: `chatGPT` (`G`), `cursor` (`C`), `hermes` (`N`, titled “Nous”), `deepSeek` (`D`), `none` (hidden)
-- `setMenuBarSlot(_:at:)` swaps when the chosen provider already occupies the other slot, so both slots stay distinct; `none` is refused when it would blank both slots
+- `loadMenuBarSlots()` drops duplicate providers, allows at most `menuBarSlotCount - 1` (2) hidden slots, backfills the rest from real providers, and therefore migrates a store written by the two-slot version without losing it
+- `setMenuBarSlot(_:at:)` swaps when the chosen provider already occupies another slot, so slots stay distinct; `none` is refused when every other slot is already hidden
+- Quick switching also lives in the status-item right-click menu as one “Menu bar slot N” submenu per slot, with `none` greyed out by the same `canHideSlot(at:)` rule the popover uses
 - Values come from `UsageMonitor.value(for:)`: percent for quota providers, `$` balance for DeepSeek
 
 ## Polling & freshness

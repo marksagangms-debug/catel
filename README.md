@@ -14,13 +14,13 @@ G 20% | C 13% | N 7%
 
 ## Features
 
-- **Menu bar at a glance** -- two configurable slots, plain monospaced text, tinted by macOS for light and dark menu bars.
+- **Menu bar at a glance** -- three configurable slots, plain monospaced text, tinted by macOS for light and dark menu bars.
 - **Hover popover** -- hover the item (or click to pin it) for the detail:
   - **ChatGPT**: 5-hour and 7-day meters with reset countdowns and plan tag.
   - **Cursor**: Cursor Models and Other Models meters, billing-cycle reset, radio dot to pick which bucket drives the menu bar.
   - **Nous / Hermes**: subscription meter, credits left of the monthly allowance, top-up line when purchased credits exist, cycle reset.
   - **DeepSeek**: account balance (API account, denominated in USD).
-- **Choose what the menu bar shows** -- pick providers per slot from the popover, or right-click the menu bar item for a quick switcher. A slot can be hidden.
+- **Choose what the menu bar shows** -- pick providers per slot from the popover, or right-click the menu bar item for a quick switcher. Up to two slots can be hidden.
 - **Polls every 60 seconds** and refreshes on hover when the data is stale.
 - **Fails soft** -- a dead endpoint keeps the last good numbers and marks them stale instead of blanking out.
 - **Quit** lives in the popover footer (there is no Dock icon).
@@ -68,10 +68,10 @@ xattr -dr com.apple.quarantine /Applications/Catel.app
 | Hover the menu bar item | Shows the popover after ~120 ms |
 | Move away from item and popover | Closes after ~200 ms |
 | Click the item | Pins the popover open; click again to unpin |
-| Right-click the item | Cursor Models / Other Models, menu bar slot 1, Quit |
+| Right-click the item | Cursor Models / Other Models, Menu bar slot 1-3 submenus, Quit |
 | Click anywhere else | Closes the popover |
 
-**Menu bar slots.** The popover's *Menu bar* row has two slot pickers: ChatGPT, Cursor, Nous, DeepSeek, or None (hidden). At most one slot can be hidden so the item never disappears. Slot choice and the Cursor bucket are remembered in `UserDefaults`.
+**Menu bar slots.** The popover's *Menu bar* row has three slot pickers: ChatGPT, Cursor, Nous, DeepSeek, or None (hidden). At most two slots can be hidden, so `None` greys out on the last visible slot and the item itself never disappears. Picking a provider that already occupies another slot swaps the two instead of duplicating it. Slot choice and the Cursor bucket are remembered in `UserDefaults`.
 
 **Values shown:** `G` = ChatGPT 5-hour window % used, `C` = the Cursor bucket you selected (Cursor Models or Other Models), `N` = Nous subscription credits used this period, `D` = DeepSeek balance in dollars.
 

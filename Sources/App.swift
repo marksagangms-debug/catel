@@ -358,26 +358,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         menu.addItem(.separator())
 
-        // Quick slot switching: assigns the primary slot, swapping if already slotted.
-        let slotHeader = NSMenuItem(title: "Menu bar slot 1", action: nil, keyEquivalent: "")
-        slotHeader.isEnabled = false
-        menu.addItem(slotHeader)
-
-        for provider in MenuBarProvider.allCases {
-            let item = NSMenuItem(
-                title: provider.title,
-                action: #selector(selectPrimarySlot(_:)),
+        // Quick slot switching: assigns one slot, swapping when the provider is
+        // already slotted elsewhere so the slots stay distinct. Submenus keep the
+        // right-click menu short now that there are three slots.
+        for index in 0..<UsageMonitor.menuBarSlotCount {
+            let slotItem = NSMenuItem(
+                title: "Menu bar slot \(index + 1)",
+                action: nil,
                 keyEquivalent: ""
             )
-            item.target = self
-            item.representedObject = provider.rawValue
-            item.state = monitor.menuBarSlots.first == provider ? .on : .off
-            // Same rule as the popover picker: `None` is unavailable while the
-            // other slot is already hidden.
-            if provider == .none, !monitor.canHideSlot(at: 0) {
-                item.isEnabled = false
-            }
-            menu.addItem(item)
+            slotItem.submenu = makeSlotMenu(for: index)
+            menu.addItem(slotItem)
         }
 
         menu.addItem(.separator())
@@ -396,6 +387,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
     }
 
+    /// Provider options for one menu-bar slot. `None` stays visible but greyed out
+    /// while the other slots already hide everything: same rule as the popover picker.
+    private func makeSlotMenu(for index: Int) -> NSMenu {
+        let slotMenu = NSMenu()
+        let current = monitor.menuBarSlots.indices.contains(index) ? monitor.menuBarSlots[index] : nil
+        let noneAvailable = monitor.canHideSlot(at: index)
+
+        for provider in MenuBarProvider.allCases {
+            let item = NSMenuItem(
+                title: provider.title,
+                action: #selector(selectSlotProvider(_:)),
+                keyEquivalent: ""
+            )
+            item.target = self
+            item.representedObject = provider.rawValue
+            item.tag = index
+            item.state = current == provider ? .on : .off
+            if provider == .none, !noneAvailable {
+                item.isEnabled = false
+            }
+            slotMenu.addItem(item)
+        }
+
+        return slotMenu
+    }
+
     @objc private func selectCursorMetric(_ sender: NSMenuItem) {
         guard
             let raw = sender.representedObject as? String,
@@ -404,12 +421,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         monitor.setCursorStatusMetric(metric)
     }
 
-    @objc private func selectPrimarySlot(_ sender: NSMenuItem) {
+    @objc private func selectSlotProvider(_ sender: NSMenuItem) {
         guard
             let raw = sender.representedObject as? String,
             let provider = MenuBarProvider(rawValue: raw)
         else { return }
-        monitor.setMenuBarSlot(provider, at: 0)
+        monitor.setMenuBarSlot(provider, at: sender.tag)
     }
 
     @objc private func quitApp(_ sender: Any?) {

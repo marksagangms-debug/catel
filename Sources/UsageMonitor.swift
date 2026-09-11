@@ -172,7 +172,7 @@ final class UsageMonitor: ObservableObject {
     private static let cursorStatusMetricKey = "cursorStatusMetric"
     private static let menuBarSlotsKey = "menuBarSlots"
 
-    static let menuBarSlotCount = 2
+    static let menuBarSlotCount = 3
 
     @Published private(set) var chatGPTUsage: ChatGPTUsage?
     @Published private(set) var cursorUsage: CursorUsage?
@@ -184,7 +184,7 @@ final class UsageMonitor: ObservableObject {
     @Published private(set) var deepSeekStatus: ProviderStatus = .loading
     @Published private(set) var lastUpdated: Date?
     @Published private(set) var cursorStatusMetric: CursorStatusMetric
-    /// Exactly two providers, in display order, drive the menu-bar title.
+    /// Exactly `menuBarSlotCount` providers, in display order, drive the menu-bar title.
     @Published private(set) var menuBarSlots: [MenuBarProvider]
 
     var onChange: (() -> Void)?
@@ -209,23 +209,33 @@ final class UsageMonitor: ObservableObject {
     }
 
     private static func loadMenuBarSlots() -> [MenuBarProvider] {
-        let fallback: [MenuBarProvider] = [.chatGPT, .cursor]
+        let fallback: [MenuBarProvider] = [.chatGPT, .cursor, .hermes]
 
         guard let raw = UserDefaults.standard.array(forKey: menuBarSlotsKey) as? [String] else {
             return fallback
         }
 
         var slots: [MenuBarProvider] = []
+        var hiddenCount = 0
         for entry in raw {
-            guard let provider = MenuBarProvider(rawValue: entry), !slots.contains(provider) else { continue }
-            // At most one hidden slot; the menu bar must always show something.
-            if provider == .none, slots.contains(.none) { continue }
+            guard let provider = MenuBarProvider(rawValue: entry) else { continue }
+
+            // At most `menuBarSlotCount - 1` hidden slots; the menu bar must always
+            // show something. `none` is checked by count, not by duplicate, so a
+            // stored preference may legitimately hide more than one slot.
+            if provider == .none {
+                guard hiddenCount < menuBarSlotCount - 1 else { continue }
+                hiddenCount += 1
+            } else if slots.contains(provider) {
+                continue
+            }
+
             slots.append(provider)
 
             if slots.count == menuBarSlotCount { break }
         }
 
-        // Backfill from real providers so the popover always has two fields.
+        // Backfill from real providers so the popover always has a field per slot.
         for provider in MenuBarProvider.realProviders where slots.count < menuBarSlotCount {
             if !slots.contains(provider) {
                 slots.append(provider)
@@ -235,13 +245,13 @@ final class UsageMonitor: ObservableObject {
         return slots.isEmpty ? fallback : Array(slots.prefix(menuBarSlotCount))
     }
 
-    /// `None` is only selectable while the other slot still shows a provider:
-    /// the menu bar must never end up empty.
+    /// `None` is only selectable while at least one other slot still shows a
+    /// provider: the menu bar must never end up empty.
     func canHideSlot(at index: Int) -> Bool {
         guard index >= 0, index < Self.menuBarSlotCount else { return false }
-        let other = index == 0 ? 1 : 0
-        guard menuBarSlots.indices.contains(other) else { return true }
-        return menuBarSlots[other] != .none
+        return menuBarSlots.enumerated().contains { offset, provider in
+            offset != index && provider != .none
+        }
     }
 
     func setMenuBarSlot(_ provider: MenuBarProvider, at index: Int) {
@@ -256,12 +266,14 @@ final class UsageMonitor: ObservableObject {
         guard slots[index] != provider else { return }
 
         if provider == .none {
-            // Both slots must never be hidden at once, or the menu-bar item vanishes.
-            let other = index == 0 ? 1 : 0
-            guard slots.indices.contains(other), slots[other] != .none else { return }
+            // Every other slot must keep a provider, or the menu-bar item vanishes.
+            let otherIsVisible = slots.enumerated().contains { offset, existing in
+                offset != index && existing != .none
+            }
+            guard otherIsVisible else { return }
             slots[index] = .none
         } else if let existing = slots.firstIndex(of: provider) {
-            // Swapping keeps both slots distinct instead of blanking the other one.
+            // Swapping keeps slots distinct instead of blanking the other one.
             slots.swapAt(index, existing)
         } else {
             slots[index] = provider

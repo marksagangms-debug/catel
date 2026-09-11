@@ -13,12 +13,12 @@ It does **not** track OpenAI developer API spend (`platform.openai.com`). Those 
 
 ## Current features
 
-- Menu bar title built from **two configurable slots**, default `G` (ChatGPT) and `C` (Cursor):
+- Menu bar title built from **three configurable slots**, default `G` (ChatGPT), `C` (Cursor), and `N` (Nous):
   - `G` = ChatGPT **5-hour** window `% used`
   - `C` = selected Cursor bucket `% used` (default **Other Models**; switch in the popover or right-click menu)
   - `N` = Nous Portal subscription credits `% used` this billing period
   - `D` = DeepSeek account balance (`$`)
-  - A slot can be set to **None** (hidden); at most one, so the item never disappears
+  - Slots can be set to **None** (hidden); at most two, so the item never disappears
 - Hover (or click to pin) a compact popover with:
   - a **Menu bar** row: one picker per slot (ChatGPT / Cursor / Nous / DeepSeek / None)
   - ChatGPT: 5-hour + 7-day meters and reset times
@@ -26,7 +26,7 @@ It does **not** track OpenAI developer API spend (`platform.openai.com`). Those 
   - Nous: subscription meter, remaining `$` of monthly credits, cycle reset; top-up line when purchased credits exist
   - DeepSeek: balance row
 - Polls every **60 seconds**; refreshes on hover if stale
-- Quit from the popover footer; right-click the item for Cursor bucket + slot 1 shortcuts
+- Quit from the popover footer; right-click the item for Cursor bucket + slot 1/2/3 shortcuts
 - App icon: cat avatar (`Resources/AppIcon.icns`), copied into the `.app` / Applications install
 - If Finder still shows a generic icon after reinstall, relaunch Finder or log out/in once (icon cache)
 

@@ -78,6 +78,7 @@ struct PopoverView: View {
                 ForEach(Array(monitor.menuBarSlots.enumerated()), id: \.offset) { index, provider in
                     MenuBarSlotPicker(
                         provider: provider,
+                        index: index,
                         isNoneAvailable: monitor.canHideSlot(at: index),
                         onChange: { monitor.setMenuBarSlot($0, at: index) }
                     )
@@ -287,6 +288,8 @@ private struct MicroText: View {
 /// let AppKit substitute its own chrome (leading chevron, system font, no fill).
 private struct MenuBarSlotPicker: View {
     let provider: MenuBarProvider
+    /// Slot position, used for the accessibility label and the `None` rule.
+    let index: Int
     let isNoneAvailable: Bool
     let onChange: (MenuBarProvider) -> Void
 
@@ -299,6 +302,9 @@ private struct MenuBarSlotPicker: View {
                     .font(.system(size: CatelToken.fieldFontSize, weight: .medium))
                     .foregroundStyle(CatelToken.textPrimary)
                     .lineLimit(1)
+                    // Three fields share one row, so the longest name ("DeepSeek")
+                    // scales down instead of truncating.
+                    .minimumScaleFactor(0.85)
 
                 Spacer(minLength: 6)
 
@@ -319,7 +325,7 @@ private struct MenuBarSlotPicker: View {
             )
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("Menu bar slot: \(provider.title)")
+        .accessibilityLabel("Menu bar slot \(index + 1): \(provider.title)")
     }
 
     private func presentMenu() {
@@ -333,7 +339,7 @@ private struct MenuBarSlotPicker: View {
             )
             item.representedObject = option.rawValue
             item.state = option == provider ? .on : .off
-            // Grey out `None` when the other slot is already hidden.
+            // Grey out `None` when the other two slots are already hidden.
             if option == .none, !isNoneAvailable {
                 item.isEnabled = false
             }
@@ -613,8 +619,9 @@ final class PopoverViewController: NSViewController {
     private let monitor: UsageMonitor
     private let pointerChanged: (Bool) -> Void
 
-    /// Content width plus the 12pt padding on each side.
-    static let popoverSize = NSSize(width: 300, height: 452)
+    /// Width fits three slot fields side by side: 3 × 94pt fields + 2 × 8pt gaps
+    /// = 298pt of content, plus the 12pt padding on each side (see `CatelToken`).
+    static let popoverSize = NSSize(width: 324, height: 452)
 
     init(monitor: UsageMonitor, pointerChanged: @escaping (Bool) -> Void) {
         self.monitor = monitor
