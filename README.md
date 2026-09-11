@@ -71,7 +71,7 @@ xattr -dr com.apple.quarantine /Applications/Catel.app
 | Right-click the item | Cursor Models / Other Models, Menu bar slot 1-3 submenus, Quit |
 | Click anywhere else | Closes the popover |
 
-**Menu bar slots.** The popover's *Menu bar* row has three slot pickers: ChatGPT, Cursor, Nous, DeepSeek, or None (hidden). At most two slots can be hidden, so `None` greys out on the last visible slot and the item itself never disappears. Picking a provider that already occupies another slot swaps the two instead of duplicating it. Slot choice and the Cursor bucket are remembered in `UserDefaults`.
+**Menu bar slots.** The popover's *Menu bar* row has three slot pickers: ChatGPT, Cursor, Nous, DeepSeek, or None (hidden). At most two slots can be hidden, so on the last visible slot `None` is greyed out, cannot be clicked, and shows the "operation not allowed" cursor when you hover it. Picking a provider that already occupies another slot swaps the two instead of duplicating it. Slot choice and the Cursor bucket are remembered in `UserDefaults`.
 
 **Values shown:** `G` = ChatGPT 5-hour window % used, `C` = the Cursor bucket you selected (Cursor Models or Other Models), `N` = Nous subscription credits used this period, `D` = DeepSeek balance in dollars.
 
@@ -109,6 +109,7 @@ Sources/
   HermesUsage.swift    Nous Portal account/credits client
   DeepSeekUsage.swift  DeepSeek balance client
   PopoverView.swift    SwiftUI popover + AppKit hosting
+  SlotMenu.swift       Slot menu builder + cursor-aware unavailable row
 Info.plist             LSUIElement accessory app, icon, bundle id
 build.sh               Compiles the .app bundle and the icon
 Resources/             AppIcon-source.png + generated AppIcon.icns

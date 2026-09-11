@@ -329,23 +329,13 @@ private struct MenuBarSlotPicker: View {
     }
 
     private func presentMenu() {
-        let menu = NSMenu()
-
-        for option in MenuBarProvider.allCases {
-            let item = NSMenuItem(
-                title: option.title,
-                action: #selector(MenuBarSlotTarget.select(_:)),
-                keyEquivalent: ""
-            )
-            item.representedObject = option.rawValue
-            item.state = option == provider ? .on : .off
-            // Grey out `None` when the other two slots are already hidden.
-            if option == .none, !isNoneAvailable {
-                item.isEnabled = false
-            }
-            item.target = MenuBarSlotTarget.shared
-            menu.addItem(item)
-        }
+        let menu = SlotMenuFactory.makeMenu(
+            selected: provider,
+            canHideNone: isNoneAvailable,
+            slotIndex: index,
+            target: MenuBarSlotTarget.shared,
+            action: #selector(MenuBarSlotTarget.select(_:))
+        )
 
         MenuBarSlotTarget.shared.onSelect = onChange
 
@@ -353,7 +343,7 @@ private struct MenuBarSlotPicker: View {
         // screen-space, matching NSEvent.mouseLocation). Converting a SwiftUI frame
         // into AppKit window coords is easy to get wrong, and the pointer is
         // guaranteed to be on the field that was just clicked anyway.
-        menu.popUp(positioning: nil, at: NSEvent.mouseLocation, in: nil)
+        SlotMenuFactory.popUp(menu, at: NSEvent.mouseLocation)
     }
 }
 

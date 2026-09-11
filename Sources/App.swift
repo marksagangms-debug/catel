@@ -380,37 +380,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         quitItem.target = self
         menu.addItem(quitItem)
 
-        menu.popUp(
-            positioning: nil,
+        SlotMenuFactory.popUp(
+            menu,
             at: NSPoint(x: 0, y: statusButton.bounds.height + 4),
             in: statusButton
         )
     }
 
     /// Provider options for one menu-bar slot. `None` stays visible but greyed out
-    /// while the other slots already hide everything: same rule as the popover picker.
+    /// (and shows the not-allowed cursor) while the other slots already hide
+    /// everything: the rule lives in `SlotMenuFactory`, shared with the popover.
     private func makeSlotMenu(for index: Int) -> NSMenu {
-        let slotMenu = NSMenu()
         let current = monitor.menuBarSlots.indices.contains(index) ? monitor.menuBarSlots[index] : nil
-        let noneAvailable = monitor.canHideSlot(at: index)
 
-        for provider in MenuBarProvider.allCases {
-            let item = NSMenuItem(
-                title: provider.title,
-                action: #selector(selectSlotProvider(_:)),
-                keyEquivalent: ""
-            )
-            item.target = self
-            item.representedObject = provider.rawValue
-            item.tag = index
-            item.state = current == provider ? .on : .off
-            if provider == .none, !noneAvailable {
-                item.isEnabled = false
-            }
-            slotMenu.addItem(item)
-        }
-
-        return slotMenu
+        return SlotMenuFactory.makeMenu(
+            selected: current ?? .none,
+            canHideNone: monitor.canHideSlot(at: index),
+            slotIndex: index,
+            target: self,
+            action: #selector(selectSlotProvider(_:))
+        )
     }
 
     @objc private func selectCursorMetric(_ sender: NSMenuItem) {

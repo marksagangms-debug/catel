@@ -34,6 +34,7 @@ App launch
 | `Sources/HermesUsage.swift` | Hermes/Nous Portal token read + account fetch + parse |
 | `Sources/DeepSeekUsage.swift` | DeepSeek API key read + balance fetch + parse |
 | `Sources/PopoverView.swift` | Popover SwiftUI, design tokens, AppKit hosting view controller |
+| `Sources/SlotMenu.swift` | Slot menu builder shared by both entry points + the cursor-aware unavailable row |
 
 ## ChatGPT data path
 
@@ -110,7 +111,9 @@ Every endpoint used here is **unofficial / undocumented** and can change: ChatGP
 - `MenuBarProvider`: `chatGPT` (`G`), `cursor` (`C`), `hermes` (`N`, titled “Nous”), `deepSeek` (`D`), `none` (hidden)
 - `loadMenuBarSlots()` drops duplicate providers, allows at most `menuBarSlotCount - 1` (2) hidden slots, backfills the rest from real providers, and therefore migrates a store written by the two-slot version without losing it
 - `setMenuBarSlot(_:at:)` swaps when the chosen provider already occupies another slot, so slots stay distinct; `none` is refused when every other slot is already hidden
-- Quick switching also lives in the status-item right-click menu as one “Menu bar slot N” submenu per slot, with `none` greyed out by the same `canHideSlot(at:)` rule the popover uses
+- The slot menu is built by `SlotMenuFactory` (`Sources/SlotMenu.swift`) for both the popover picker and the status-item right-click submenus. It sets `autoenablesItems = false`, because AppKit's automatic enabling re-enables any item whose target responds to the action at display time, undoing an explicit `isEnabled = false`
+- When `None` cannot be chosen, the item keeps its disabled state and its content is replaced by `UnavailableMenuRowView`, which draws the row through `NSMenuItemCell` (native disabled grey, native inset) and shows the not-allowed cursor while the pointer is over it. `SlotMenuFactory.popUp(_:at:in:)` resets the cursor after the menu closes
+- Quick switching also lives in the status-item right-click menu as one “Menu bar slot N” submenu per slot
 - Values come from `UsageMonitor.value(for:)`: percent for quota providers, `$` balance for DeepSeek
 
 ## Polling & freshness
