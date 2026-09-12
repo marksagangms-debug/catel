@@ -70,7 +70,7 @@ Sources/
   HermesUsage.swift    # Nous Portal account/credits client
   DeepSeekUsage.swift  # DeepSeek balance client
   PopoverView.swift    # SwiftUI popover UI + AppKit hosting
-  SlotMenu.swift       # Slot menu builder + cursor-aware unavailable row
+  SlotMenu.swift       # Slot menu builder for both entry points
 Info.plist             # LSUIElement accessory app + icon
 build.sh               # Compiles .app bundle + icon
 Resources/             # AppIcon source + .icns

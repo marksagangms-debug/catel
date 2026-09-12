@@ -380,8 +380,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         quitItem.target = self
         menu.addItem(quitItem)
 
-        SlotMenuFactory.popUp(
-            menu,
+        menu.popUp(
+            positioning: nil,
             at: NSPoint(x: 0, y: statusButton.bounds.height + 4),
             in: statusButton
         )

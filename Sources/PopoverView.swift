@@ -343,7 +343,7 @@ private struct MenuBarSlotPicker: View {
         // screen-space, matching NSEvent.mouseLocation). Converting a SwiftUI frame
         // into AppKit window coords is easy to get wrong, and the pointer is
         // guaranteed to be on the field that was just clicked anyway.
-        SlotMenuFactory.popUp(menu, at: NSEvent.mouseLocation)
+        menu.popUp(positioning: nil, at: NSEvent.mouseLocation, in: nil)
     }
 }
 

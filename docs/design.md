@@ -51,7 +51,7 @@ recovers from frame-layout events that can omit the initial enter callback.
 - One picker per slot: current provider name + chevron, 30pt field with rounded 7pt border
 - Width math: the three fields need 94pt each (`DeepSeek` at 12pt medium is the widest label at ~59pt, plus 20pt padding, a 6pt minimum gap, and the chevron), so content is 298pt and the popover is 324pt wide. Labels also carry `minimumScaleFactor(0.85)` so a long name scales rather than truncating.
 - Menu offers ChatGPT / Cursor / Nous / DeepSeek / None; the active one is checked
-- `None` stays visible but is **unavailable** when the other two slots are already hidden: the title is greyed with AppKit's own menu-item cell (so font, inset and alignment match the other rows, and the row draws the standard disabled grey), hovering it shows the **"operation not allowed" cursor**, and the click is swallowed. The menu is created with `autoenablesItems = false`; with AppKit's default automatic enabling, an item whose target responds to the action is re-enabled before display, which made that row look and behave as if it were selectable. `SlotMenuFactory` builds this menu for both the popover picker and the status-item right-click submenus so the rule cannot drift.
+- `None` stays visible but is **disabled** when the other two slots are already hidden: AppKit greys it out and refuses the click. The menu is created with `autoenablesItems = false`, because with AppKit's default automatic enabling an item whose target responds to the action is re-enabled before display, which made that row look and behave as if it were selectable. `SlotMenuFactory` builds this menu for both the popover picker and the status-item right-click submenus so the rule cannot drift.
 
 ### ChatGPT section
 
