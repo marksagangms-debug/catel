@@ -118,9 +118,19 @@ Every endpoint used here is **unofficial / undocumented** and can change: ChatGP
 ## Polling & freshness
 
 - Timer: **60s**
-- On hover: refresh if last success is older than 60s
+- On hover: refresh if last success is older than 60s (`refreshIfStale`)
 - Concurrent refreshes are skipped while the provider requests are in flight (`pendingRequests` counter)
 - Failures keep last good snapshot and mark provider status `stale` / `unavailable`
+
+## Read-only guarantee
+
+The app makes no writes to any credential or data file. The only `FileManager`/`Process` reads are:
+
+- `Data(contentsOf:)` for `~/.codex/auth.json` and `~/.hermes/auth.json`, with `.mappedIfSafe` (mapped read, no write)
+- `String(contentsOf:)` for `~/.hermes/.env`, to pull `DEEPSEEK_API_KEY`
+- `/usr/bin/sqlite3` opened with `-readonly` against `file:<db>?mode=ro&immutable=1`, selecting one `ItemTable` row
+
+Nothing calls `write`, `createFile`, `setAttributes`, or any mutating API. The only persisted state is `UserDefaults` (`menuBarSlots`, `cursorStatusMetric`).
 
 ## Error model
 

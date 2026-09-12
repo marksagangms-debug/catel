@@ -10,7 +10,7 @@ No Dock icon. No settings window. No account, no server, no telemetry. Catel rea
 G 20% | C 13% | N 7%
 ```
 
-`G` ChatGPT 5-hour window · `C` Cursor selected bucket · `N` Nous subscription credits
+The three slots are yours to assign, so the bar can show any mix of `G` ChatGPT (5-hour window), `C` Cursor (selected bucket), `N` Nous subscription credits, and `D` DeepSeek balance. The example above is the default layout.
 
 ## Features
 
