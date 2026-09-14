@@ -20,7 +20,7 @@ G{4px}20% | C{4px}13% | N{4px}7%
 - Plain text only — **no** left border, **no** colored backgrounds/gradients
 - Letter → value spacing: **4px** (`NSKernAttributeName` / kern = 4)
 - Between slots: thin `|` divider at ~40% text opacity, with spaces around it (`" | "`)
-- Slot labels: `G` ChatGPT, `C` Cursor, `N` Nous, `D` DeepSeek; a `None` slot renders nothing at all (no label, no divider)
+- Slot labels: `G` ChatGPT, `C` Cursor, `N` Nous, `D` DeepSeek, `O` OpenCode; a `None` slot renders nothing at all (no label, no divider)
 - Monospaced system font, 11pt semibold
 - Text is rendered as a **template image** so macOS tints it for light/dark menu bar backgrounds (same mechanism as system status icons)
 
@@ -40,17 +40,18 @@ recovers from frame-layout events that can omit the initial enter callback.
 
 ## Popover
 
-- Size **324×452**, no system popover animation (`animates = false`)
-- SwiftUI content hosted in `NSPopover` inside a `PopoverTrackingView` (which reports pointer enter/exit back to the status item controller)
-- Sections stack top to bottom: **Menu bar** picker, ChatGPT, Cursor, Nous, DeepSeek, footer
+- Size **324×528**, no system popover animation (`animates = false`)
+- SwiftUI content in `NSPopover` inside a `PopoverTrackingView` (which reports pointer enter/exit back to the status item controller)
+- Sections stack top to bottom: **Menu bar** picker, ChatGPT, Cursor, Nous, DeepSeek, OpenCode Go, footer
 - Design tokens live in `CatelToken` (`PopoverView.swift`) — the exact computed styles from the Paper file “Catel”. Keep them in sync when the design changes.
 
 ### Menu bar section
 
 - Header row: `MENU BAR` + `3 slots`
 - One picker per slot: current provider name + chevron, 30pt field with rounded 7pt border
-- Width math: the three fields need 94pt each (`DeepSeek` at 12pt medium is the widest label at ~59pt, plus 20pt padding, a 6pt minimum gap, and the chevron), so content is 298pt and the popover is 324pt wide. Labels also carry `minimumScaleFactor(0.85)` so a long name scales rather than truncating.
-- Menu offers ChatGPT / Cursor / Nous / DeepSeek / None; the active one is checked
+- Width math: the three fields need 94pt each (`OpenCode` is now the widest label at ~61pt at 12pt medium, ahead of `DeepSeek` at ~59pt, plus 20pt padding, a 6pt minimum gap, and the chevron), so content is 298pt and the popover is 324pt wide. Labels also carry `minimumScaleFactor(0.85)`, so `OpenCode` renders at ~52pt instead of truncating.
+- Height math: measured intrinsic content height is **468pt** for the five provider sections (a `NSHostingView.fittingSize` measurement with live data; the four-section build measured 393pt against its 452pt frame). 528pt keeps the same ~59pt headroom for stale/loading notes.
+- Menu offers ChatGPT / Cursor / Nous / DeepSeek / OpenCode / None; the active one is checked
 - `None` stays visible but is **disabled** when the other two slots are already hidden: AppKit greys it out and refuses the click. The menu is created with `autoenablesItems = false`, because with AppKit's default automatic enabling an item whose target responds to the action is re-enabled before display, which made that row look and behave as if it were selectable. `SlotMenuFactory` builds this menu for both the popover picker and the status-item right-click submenus so the rule cannot drift.
 
 ### ChatGPT section
@@ -82,6 +83,14 @@ recovers from frame-layout events that can omit the initial enter callback.
 - Single row: `Balance` on the left, `$` amount on the right (DeepSeek has no percent concept)
 - Value color: green (`#248A3D`)
 
+### OpenCode Go section
+
+- Title: `OpenCode Go` + tag `GO`
+- Columns: **5-hour** | **Weekly** | **Monthly**, same label/`%`/bar/reset shape as the ChatGPT windows, three columns instead of two
+- The three windows come from OpenCode's Go limits: 5-hour, weekly, and monthly dollar caps, reported as a `%` used per window
+- Bar / `%` color: purple (`#AF52DE`)
+- Column width is 92pt; the longest reset caption measured (`resets in 29d 23h`, 9pt) is ~77pt, so captions do not truncate
+
 ### Footer
 
 - Hairline divider, then left: relative last-updated text (`Updated 1 second ago`) and right: **Quit**
@@ -100,6 +109,7 @@ recovers from frame-layout events that can omit the initial enter callback.
 - Intentionally **not** showing Cursor `$used / $limit` in the popover (that mixed metrics and confused the UI)
 - Nous **does** show remaining dollars under the percent meter because the Portal is credit-denominated; `%` still matches the menu-bar `N`
 - DeepSeek is a balance, not a quota, so it uses a label/value row instead of a meter
+- OpenCode Go shows all three limit windows in the popover but only the **5-hour** window in the menu bar, because that is the one that throttles a coding session first; weekly and monthly are context
 - Accessory app (`LSUIElement`): no Dock icon; Quit must live in the popover and the right-click menu
 
 ## When changing UI

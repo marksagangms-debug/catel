@@ -18,7 +18,7 @@ There is no server, database, or cloud backend for this app. It only **reads loc
 ```text
 App launch
   → UsageMonitor starts (immediate refresh + 60s timer)
-  → ChatGPTUsageClient + CursorUsageClient + HermesUsageClient + DeepSeekUsageClient fetch in parallel
+  → ChatGPTUsageClient + CursorUsageClient + HermesUsageClient + DeepSeekUsageClient + OpenCodeUsageClient fetch in parallel
   → Status item title updates (three configured slots)
   → Hover/click shows PopoverView bound to UsageMonitor
 ```
@@ -33,6 +33,7 @@ App launch
 | `Sources/CursorUsage.swift` | Cursor token read + usage fetch + parse |
 | `Sources/HermesUsage.swift` | Hermes/Nous Portal token read + account fetch + parse |
 | `Sources/DeepSeekUsage.swift` | DeepSeek API key read + balance fetch + parse |
+| `Sources/OpenCodeUsage.swift` | OpenCode Go key read + limit-window fetch + parse |
 | `Sources/PopoverView.swift` | Popover SwiftUI, design tokens, AppKit hosting view controller |
 | `Sources/SlotMenu.swift` | Slot menu builder shared by both entry points |
 
@@ -101,14 +102,29 @@ Nous Portal **refresh tokens are single-use**. Calling `POST /api/oauth/token` f
 
 DeepSeek has no percent concept, so it renders as a balance row rather than a meter.
 
+## OpenCode Go data path
+
+1. **Auth (read-only):** `~/.local/share/opencode/auth.json`
+   - `opencode-go.key` (what `opencode providers` / `/connect` writes)
+2. **API:** `GET https://opencode.ai/zen/go/v1/usage`
+   - Header: `Authorization: Bearer <key>`
+3. **Parsed fields:** `usage.rolling` (5-hour), `usage.weekly`, `usage.monthly`
+   - each window: `percent` → `% used`, `resetsAt` (ISO-8601) → reset countdown
+   - `windowSeconds` is set client-side (5h / 7d / 30d) for reference only
+4. **Menu-bar `O`:** the **5-hour rolling** window percentage, falling back to weekly then monthly if the response omits rolling
+
+### Important OpenCode caveat
+
+OpenCode Go limits are dollar-denominated and **per model** (the monthly allowance differs by model: $15, $30, or $60), but the usage endpoint reports a single percentage per window, already normalised against whatever model mix you actually used. Catel shows that percentage rather than recomputing dollars, so no model-price table is needed. This endpoint is not documented as a public API; it is the one the OpenCode console/TUI reads.
+
 ### Unofficial endpoints
 
-Every endpoint used here is **unofficial / undocumented** and can change: ChatGPT `wham/usage`, Cursor `GetCurrentPeriodUsage`, and the Nous Portal account API. The DeepSeek balance endpoint is documented.
+Every endpoint used here is **unofficial / undocumented** and can change: ChatGPT `wham/usage`, Cursor `GetCurrentPeriodUsage`, the Nous Portal account API, and the OpenCode Go usage endpoint. The DeepSeek balance endpoint is documented.
 
 ## Menu bar slots
 
 - `UsageMonitor.menuBarSlots` holds exactly `UsageMonitor.menuBarSlotCount` (3) `MenuBarProvider` values in display order, persisted as a `UserDefaults` array under `menuBarSlots` (default `[chatGPT, cursor, hermes]`)
-- `MenuBarProvider`: `chatGPT` (`G`), `cursor` (`C`), `hermes` (`N`, titled “Nous”), `deepSeek` (`D`), `none` (hidden)
+- `MenuBarProvider`: `chatGPT` (`G`), `cursor` (`C`), `hermes` (`N`, titled “Nous”), `deepSeek` (`D`), `openCode` (`O`, titled “OpenCode”), `none` (hidden)
 - `loadMenuBarSlots()` drops duplicate providers, allows at most `menuBarSlotCount - 1` (2) hidden slots, backfills the rest from real providers, and therefore migrates a store written by the two-slot version without losing it
 - `setMenuBarSlot(_:at:)` swaps when the chosen provider already occupies another slot, so slots stay distinct; `none` is refused when every other slot is already hidden
 - The slot menu is built by `SlotMenuFactory` (`Sources/SlotMenu.swift`) for both the popover picker and the status-item right-click submenus. It sets `autoenablesItems = false`, because AppKit's automatic enabling re-enables any item whose target responds to the action at display time, undoing an explicit `isEnabled = false`. `None` is then simply disabled: AppKit greys it out and refuses the click
@@ -126,7 +142,7 @@ Every endpoint used here is **unofficial / undocumented** and can change: ChatGP
 
 The app makes no writes to any credential or data file. The only `FileManager`/`Process` reads are:
 
-- `Data(contentsOf:)` for `~/.codex/auth.json` and `~/.hermes/auth.json`, with `.mappedIfSafe` (mapped read, no write)
+- `Data(contentsOf:)` for `~/.codex/auth.json`, `~/.hermes/auth.json`, and `~/.local/share/opencode/auth.json`, with `.mappedIfSafe` (mapped read, no write)
 - `String(contentsOf:)` for `~/.hermes/.env`, to pull `DEEPSEEK_API_KEY`
 - `/usr/bin/sqlite3` opened with `-readonly` against `file:<db>?mode=ro&immutable=1`, selecting one `ItemTable` row
 
@@ -150,9 +166,10 @@ Nothing calls `write`, `createFile`, `setAttributes`, or any mutating API. The o
 - Tokens stay on disk where Codex/Cursor/Hermes already store them; this app only reads them
 - Do not log tokens, cookies, or raw auth JSON
 - Do not write Codex `auth.json`, Hermes `auth.json`, or Cursor DB (refresh-token writes can log the user out)
-- No telemetry or outbound calls other than the four provider APIs above
+- No telemetry or outbound calls other than the five provider APIs above
+- Do not write the OpenCode `auth.json` either; the Go key is read-only for Catel
 - The only persisted state is the menu bar slot selection and Cursor bucket preference in `UserDefaults`
 
 ## When changing backend behavior
 
-Update this file if you change endpoints, auth sources, which Cursor percentage maps to `C`, Hermes credit math, DeepSeek balance handling, menu bar slots, polling, or packaging.
+Update this file if you change endpoints, auth sources, which Cursor percentage maps to `C`, Hermes credit math, DeepSeek balance handling, OpenCode Go window handling, menu bar slots, polling, or packaging.

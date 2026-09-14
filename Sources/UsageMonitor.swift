@@ -178,10 +178,12 @@ final class UsageMonitor: ObservableObject {
     @Published private(set) var cursorUsage: CursorUsage?
     @Published private(set) var hermesUsage: HermesUsage?
     @Published private(set) var deepSeekUsage: DeepSeekUsage?
+    @Published private(set) var openCodeUsage: OpenCodeUsage?
     @Published private(set) var chatGPTStatus: ProviderStatus = .loading
     @Published private(set) var cursorStatus: ProviderStatus = .loading
     @Published private(set) var hermesStatus: ProviderStatus = .loading
     @Published private(set) var deepSeekStatus: ProviderStatus = .loading
+    @Published private(set) var openCodeStatus: ProviderStatus = .loading
     @Published private(set) var lastUpdated: Date?
     @Published private(set) var cursorStatusMetric: CursorStatusMetric
     /// Exactly `menuBarSlotCount` providers, in display order, drive the menu-bar title.
@@ -304,7 +306,7 @@ final class UsageMonitor: ObservableObject {
         }
 
         guard pendingRequests == 0 else { return }
-        pendingRequests = 4
+        pendingRequests = 5
 
         if chatGPTUsage == nil {
             chatGPTStatus = .loading
@@ -317,6 +319,9 @@ final class UsageMonitor: ObservableObject {
         }
         if deepSeekUsage == nil {
             deepSeekStatus = .loading
+        }
+        if openCodeUsage == nil {
+            openCodeStatus = .loading
         }
         onChange?()
 
@@ -343,6 +348,12 @@ final class UsageMonitor: ObservableObject {
                 self?.applyDeepSeek(result)
             }
         }
+
+        OpenCodeUsageClient.fetch { [weak self] result in
+            DispatchQueue.main.async {
+                self?.applyOpenCode(result)
+            }
+        }
     }
 
     var compactStatus: String {
@@ -364,6 +375,8 @@ final class UsageMonitor: ObservableObject {
             return hermesUsage?.usedPercent.map { formatPercent($0) }
         case .deepSeek:
             return deepSeekUsage.map { formatBalance($0.totalBalance, currency: $0.currency) }
+        case .openCode:
+            return openCodeUsage?.menuBarWindow.map { formatPercent($0.usedPercent) }
         case .none:
             return nil
         }
@@ -374,7 +387,10 @@ final class UsageMonitor: ObservableObject {
             chatGPTUsage?.primaryWindow?.usedPercent ?? 0,
             max(
                 cursorStatusMetric.percent(from: cursorUsage) ?? 0,
-                hermesUsage?.usedPercent ?? 0
+                max(
+                    hermesUsage?.usedPercent ?? 0,
+                    openCodeUsage?.menuBarWindow?.usedPercent ?? 0
+                )
             )
         )
 
@@ -439,6 +455,19 @@ final class UsageMonitor: ObservableObject {
         finishRequest()
     }
 
+    private func applyOpenCode(_ result: Result<OpenCodeUsage, UsageClientError>) {
+        switch result {
+        case .success(let usage):
+            openCodeUsage = usage
+            openCodeStatus = .ready
+            lastUpdated = Date()
+        case .failure(let error):
+            openCodeStatus = openCodeUsage == nil ? .unavailable(error.message) : .stale(error.message)
+        }
+
+        finishRequest()
+    }
+
     private func finishRequest() {
         pendingRequests = max(pendingRequests - 1, 0)
         onChange?()
@@ -457,6 +486,7 @@ enum MenuBarProvider: String, CaseIterable, Identifiable {
     case cursor
     case hermes
     case deepSeek
+    case openCode
 
     /// A deliberately empty slot: shows nothing in the menu bar.
     case none
@@ -475,6 +505,7 @@ enum MenuBarProvider: String, CaseIterable, Identifiable {
         case .cursor: return "Cursor"
         case .hermes: return "Nous"
         case .deepSeek: return "DeepSeek"
+        case .openCode: return "OpenCode"
         case .none: return "None"
         }
     }
@@ -485,6 +516,7 @@ enum MenuBarProvider: String, CaseIterable, Identifiable {
         case .cursor: return "Cursor — selected bucket"
         case .hermes: return "Nous — subscription credits"
         case .deepSeek: return "DeepSeek — balance"
+        case .openCode: return "OpenCode — Go 5-hour window"
         case .none: return "None — hidden"
         }
     }
@@ -495,6 +527,7 @@ enum MenuBarProvider: String, CaseIterable, Identifiable {
         case .cursor: return "C"
         case .hermes: return "N"
         case .deepSeek: return "D"
+        case .openCode: return "O"
         case .none: return ""
         }
     }
