@@ -20,6 +20,7 @@ enum CatelToken {
     static let nous = Color(red: 255 / 255, green: 149 / 255, blue: 0 / 255)
     static let deepSeek = Color(red: 36 / 255, green: 138 / 255, blue: 61 / 255)
     static let openCode = Color(red: 175 / 255, green: 82 / 255, blue: 222 / 255)
+    static let commandCode = Color(red: 191 / 255, green: 90 / 255, blue: 42 / 255)
 
     // Metrics
     static let contentPadding: CGFloat = 12
@@ -53,6 +54,7 @@ struct PopoverView: View {
             nousSection
             deepSeekSection
             openCodeSection
+            commandCodeSection
             footer
         }
         .padding(CatelToken.contentPadding)
@@ -238,6 +240,36 @@ struct PopoverView: View {
                 }
             } else {
                 ProviderStateView(status: monitor.openCodeStatus)
+            }
+        }
+    }
+
+    private var commandCodeSection: some View {
+        ProviderSection(
+            title: "CommandCode",
+            tag: monitor.commandCodeUsage?.planName?.uppercased() ?? "API",
+            status: monitor.commandCodeStatus
+        ) {
+            if let usage = monitor.commandCodeUsage {
+                HStack(alignment: .top, spacing: CatelToken.columnGap) {
+                    WindowMeter(
+                        title: "5-hour",
+                        window: usage.fiveHour,
+                        color: CatelToken.commandCode
+                    )
+                    WindowMeter(
+                        title: "Weekly",
+                        window: usage.weekly,
+                        color: CatelToken.commandCode
+                    )
+                    WindowMeter(
+                        title: "Monthly",
+                        window: usage.monthly,
+                        color: CatelToken.commandCode
+                    )
+                }
+            } else {
+                ProviderStateView(status: monitor.commandCodeStatus)
             }
         }
     }
@@ -643,10 +675,10 @@ final class PopoverViewController: NSViewController {
 
     /// Width fits three slot fields side by side: 3 × 94pt fields + 2 × 8pt gaps
     /// = 298pt of content, plus the 12pt padding on each side (see `CatelToken`).
-    /// Height is the measured intrinsic content height (468pt for the five provider
-    /// sections) with the same ~59pt headroom the four-section layout used, so
+    /// Height is the measured intrinsic content height (515pt for the six provider
+    /// sections) with the same ~60pt headroom the five-section layout used, so
     /// stale/loading notes still fit.
-    static let popoverSize = NSSize(width: 324, height: 528)
+    static let popoverSize = NSSize(width: 324, height: 575)
 
     init(monitor: UsageMonitor, pointerChanged: @escaping (Bool) -> Void) {
         self.monitor = monitor

@@ -171,7 +171,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let segments = monitor.menuBarSlots
             .filter { $0 != .none }
             .map { provider in
-                "\(provider.label)\(monitor.value(for: provider) ?? "--")"
+                (label: provider.label, value: monitor.value(for: provider) ?? "--")
             }
 
         statusButton.update(image: makeTitleImage(segments: segments))
@@ -179,7 +179,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem.length = statusButton.frame.width
     }
 
-    private func makeTitleImage(segments: [String]) -> NSImage {
+    private func makeTitleImage(segments: [(label: String, value: String)]) -> NSImage {
         let title = makeTitle(segments: segments)
         let bounds = title.boundingRect(
             with: NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude),
@@ -198,7 +198,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return image
     }
 
-    private func makeTitle(segments: [String]) -> NSAttributedString {
+    private func makeTitle(segments: [(label: String, value: String)]) -> NSAttributedString {
         let font = NSFont.monospacedSystemFont(ofSize: 11, weight: .semibold)
         // Template images are tinted by the system for light/dark menu bar backgrounds.
         let textColor = NSColor.black
@@ -208,7 +208,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             if index > 0 {
                 title.append(divider(font: font, color: textColor))
             }
-            title.append(spacedSegment(segment, font: font, color: textColor))
+            title.append(spacedSegment(segment.label, value: segment.value, font: font, color: textColor))
         }
         return title
     }
@@ -224,29 +224,34 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func spacedSegment(
-        _ text: String,
+        _ label: String,
+        value: String,
         font: NSFont,
         color: NSColor
     ) -> NSAttributedString {
-        let label = String(text.prefix(1))
-        let value = String(text.dropFirst())
-        let result = NSMutableAttributedString(
-            string: label,
-            attributes: [
-                .font: font,
-                .foregroundColor: color,
-                .kern: 4
-            ]
-        )
-        result.append(
-            NSAttributedString(
-                string: value,
-                attributes: [
-                    .font: font,
-                    .foregroundColor: color
-                ]
-            )
-        )
+        // The label/value gap is the kern on the label's LAST character only
+        // (kern trails every character it covers, so kerning the whole label
+        // would split "CC" into "C C"). Multi-letter labels stay grouped and the
+        // space lands between label and number.
+        let base: [NSAttributedString.Key: Any] = [
+            .font: font,
+            .foregroundColor: color
+        ]
+        let result = NSMutableAttributedString()
+
+        if label.count > 1 {
+            let headIndex = label.index(label.startIndex, offsetBy: label.count - 1)
+            result.append(NSAttributedString(string: String(label[..<headIndex]), attributes: base))
+        }
+
+        if let tail = label.last {
+            result.append(NSAttributedString(
+                string: String(tail),
+                attributes: base.merging([.kern: 4]) { _, new in new }
+            ))
+        }
+
+        result.append(NSAttributedString(string: value, attributes: base))
         return result
     }
 

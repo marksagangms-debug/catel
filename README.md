@@ -2,7 +2,7 @@
 
 <img src="Resources/AppIcon-source.png" alt="Catel app icon" width="128" align="right" />
 
-A tiny macOS **menu-bar app** that shows your AI subscription usage at a glance: ChatGPT, Cursor, Nous Portal (Hermes), DeepSeek, and OpenCode Go.
+A tiny macOS **menu-bar app** that shows your AI subscription usage at a glance: ChatGPT, Cursor, Nous Portal (Hermes), DeepSeek, OpenCode Go, and CommandCode.
 
 No Dock icon. No settings window. No account, no server, no telemetry. Catel reads the credentials your other tools already stored on your Mac, calls the vendor APIs directly, and prints the numbers in your menu bar.
 
@@ -10,7 +10,7 @@ No Dock icon. No settings window. No account, no server, no telemetry. Catel rea
 G 20% | C 13% | N 7%
 ```
 
-The three slots are yours to assign, so the bar can show any mix of `G` ChatGPT (5-hour window), `C` Cursor (selected bucket), `N` Nous subscription credits, `D` DeepSeek balance, and `O` OpenCode Go (5-hour window). The example above is the default layout.
+The three slots are yours to assign, so the bar can show any mix of `G` ChatGPT (5-hour window), `C` Cursor (selected bucket), `N` Nous subscription credits, `D` DeepSeek balance, `O` OpenCode Go (5-hour window), and `CC` CommandCode (5-hour window). The example above is the default layout.
 
 ## Features
 
@@ -21,6 +21,7 @@ The three slots are yours to assign, so the bar can show any mix of `G` ChatGPT 
   - **Nous / Hermes**: subscription meter, credits left of the monthly allowance, top-up line when purchased credits exist, cycle reset.
   - **DeepSeek**: account balance (API account, denominated in USD).
   - **OpenCode Go**: 5-hour / weekly / monthly limit meters with reset countdowns (the window that throttles you first is the one in the menu bar).
+  - **CommandCode**: 5-hour / weekly rolling caps + monthly plan-credit meter with the billing-period reset (plan tag: GOAT, Pro, Max, ...).
 - **Choose what the menu bar shows** -- pick providers per slot from the popover, or right-click the menu bar item for a quick switcher. Up to two slots can be hidden.
 - **Polls every 60 seconds** and refreshes on hover when the data is stale.
 - **Fails soft** -- a dead endpoint keeps the last good numbers and marks them stale instead of blanking out.
@@ -72,9 +73,9 @@ xattr -dr com.apple.quarantine /Applications/Catel.app
 | Right-click the item | Cursor Models / Other Models, Menu bar slot 1-3 submenus, Quit |
 | Click anywhere else | Closes the popover |
 
-**Menu bar slots.** The popover's *Menu bar* row has three slot pickers: ChatGPT, Cursor, Nous, DeepSeek, OpenCode, or None (hidden). At most two slots can be hidden, so on the last visible slot `None` is greyed out and cannot be clicked. Picking a provider that already occupies another slot swaps the two instead of duplicating it. Slot choice and the Cursor bucket are remembered in `UserDefaults`.
+**Menu bar slots.** The popover's *Menu bar* row has three slot pickers: ChatGPT, Cursor, Nous, DeepSeek, OpenCode, CmdCode, or None (hidden). At most two slots can be hidden, so on the last visible slot `None` is greyed out and cannot be clicked. Picking a provider that already occupies another slot swaps the two instead of duplicating it. Slot choice and the Cursor bucket are remembered in `UserDefaults`.
 
-**Values shown:** `G` = ChatGPT 5-hour window % used, `C` = the Cursor bucket you selected (Cursor Models or Other Models), `N` = Nous subscription credits used this period, `D` = DeepSeek balance in dollars, `O` = OpenCode Go 5-hour limit % used.
+**Values shown:** `G` = ChatGPT 5-hour window % used, `C` = the Cursor bucket you selected (Cursor Models or Other Models), `N` = Nous subscription credits used this period, `D` = DeepSeek balance in dollars, `O` = OpenCode Go 5-hour limit % used, `CC` = CommandCode 5-hour cap % used.
 
 ## Credentials and privacy
 
@@ -87,6 +88,7 @@ Catel never asks for a login and never writes to any credential store. It only *
 | Nous / Hermes | `~/.hermes/auth.json` (token, optional `portal_base_url`) | `GET {portal}/api/oauth/account` |
 | DeepSeek | `DEEPSEEK_API_KEY` from `~/.hermes/.env` | `GET https://api.deepseek.com/user/balance` |
 | OpenCode Go | `~/.local/share/opencode/auth.json` (`opencode-go` API key written by `opencode providers` / `/connect`) | `GET https://opencode.ai/zen/go/v1/usage` |
+| CommandCode | `COMMANDCODE_API_KEY` from `~/.hermes/.env` | `GET https://api.commandcode.ai/alpha/billing/credits` + `GET .../alpha/billing/subscriptions` (the same endpoints the `cmd` CLI's `/usage` meter reads) |
 
 What Catel does **not** do:
 
@@ -98,7 +100,7 @@ What Catel does **not** do:
 ### Two caveats worth knowing
 
 1. **Nous Portal refresh tokens are single-use.** Calling `POST /api/oauth/token` from Catel would rotate the token and could kill your Hermes session, so Catel deliberately does not refresh. If the token expires, open Hermes Agent once and it will refresh `~/.hermes/auth.json` for you.
-2. **Every endpoint here is unofficial / undocumented** and can change without notice. These are the same private APIs the vendor clients use. If a provider starts showing "Usage data unavailable", the response shape most likely moved. The OpenCode Go usage endpoint is the one the OpenCode console/TUI reads; it is not documented as a public API.
+2. **Every endpoint here is unofficial / undocumented** and can change without notice. These are the same private APIs the vendor clients use. If a provider starts showing "Usage data unavailable", the response shape most likely moved. The OpenCode Go usage endpoint is the one the OpenCode console/TUI reads; it is not documented as a public API. The CommandCode billing endpoints are the ones its CLI's `/usage` meter reads; the public Provider API (`/provider/v1/*`) does not expose usage.
 
 ## Project layout
 
@@ -111,6 +113,7 @@ Sources/
   HermesUsage.swift    Nous Portal account/credits client
   DeepSeekUsage.swift  DeepSeek balance client
   OpenCodeUsage.swift  OpenCode Go limit client
+  CommandCodeUsage.swift CommandCode caps/plan-credit client
   PopoverView.swift    SwiftUI popover + AppKit hosting
   SlotMenu.swift       Slot menu builder for both entry points
 Info.plist             LSUIElement accessory app, icon, bundle id
@@ -130,6 +133,7 @@ Deeper docs: [docs/overview.md](docs/overview.md) · [docs/design.md](docs/desig
 | `N --`, "Open Hermes Agent and sign in" | Make sure you are signed in to Nous Portal in Hermes, then open Hermes once so it refreshes `~/.hermes/auth.json`. |
 | DeepSeek shows nothing | Add `DEEPSEEK_API_KEY=...` to `~/.hermes/.env`. |
 | `O --` and a sign-in hint | Connect OpenCode Go in OpenCode (`opencode providers`, or `/connect` in the TUI) so `~/.local/share/opencode/auth.json` holds the Go key. |
+| `CC --` | Add `COMMANDCODE_API_KEY=...` to `~/.hermes/.env` (generate one at commandcode.ai → Studio → API keys). |
 | Generic icon in Finder after rebuilding | Finder's icon cache; relaunch Finder or log out and back in once. |
 | Stale note under a provider | Last refresh failed; the previous numbers are kept on purpose. Hover to retry or wait for the next 60s poll. |
 
