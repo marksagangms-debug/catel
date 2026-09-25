@@ -173,6 +173,7 @@ Nothing calls `write`, `createFile`, `setAttributes`, or any mutating API. The o
 
 - `Info.plist`: bundle id `com.mark.catel`, `LSUIElement`, `CFBundleIconFile=AppIcon`
 - `build.sh`: compile sources → copy plist → build `.icns` from `Resources/AppIcon-source.png` (full iconset incl. `@2x`) → copy into `Contents/Resources/`
+- The `swiftc` invocation pins `-target arm64-apple-macos13.0`. Without it the compiler stamped the binary `minos 28.0` (above the host OS 27.0), LaunchServices refused every `open` with error -10825, and only direct execution of the inner binary worked. Run `otool -l Catel.app/Contents/MacOS/Catel | grep minos` if the app "won't open".
 
 ## Security notes
 

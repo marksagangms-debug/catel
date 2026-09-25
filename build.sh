@@ -16,6 +16,7 @@ swiftc \
     -swift-version 5 \
     -parse-as-library \
     -O \
+    -target arm64-apple-macos13.0 \
     -framework SwiftUI \
     -framework AppKit \
     -framework Combine \
