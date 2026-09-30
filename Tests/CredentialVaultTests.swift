@@ -19,8 +19,8 @@ enum CredentialVaultTests {
         precondition(FileManager.default.fileExists(atPath: url.path) == false)
 
         // Saving trims, persists, and locks the file down.
-        try vault.setKey("  sk-deepseek-secret  \n", for: .deepSeek)
-        precondition(vault.key(for: .deepSeek) == "sk-deepseek-secret")
+        try vault.setKey("  test-deepseek-value  \n", for: .deepSeek)
+        precondition(vault.key(for: .deepSeek) == "test-deepseek-value")
         precondition(vault.hasKey(for: .deepSeek) == true)
 
         let filePermissions = try permissions(of: url)
