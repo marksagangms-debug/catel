@@ -33,14 +33,14 @@ enum CredentialVaultTests {
 
         let contents = try String(contentsOf: url, encoding: .utf8)
         precondition(contents.contains("\"deepSeek\""))
-        precondition(contents.contains("sk-deepseek-secret"))
+        precondition(contents.contains("test-deepseek-value"))
 
         // A second instance (fresh process equivalent) reads the same file.
         let reloaded = CredentialVault(url: url)
-        precondition(reloaded.key(for: .deepSeek) == "sk-deepseek-secret")
+        precondition(reloaded.key(for: .deepSeek) == "test-deepseek-value")
         precondition(reloaded.key(for: .commandCode) == nil)
         precondition(reloaded.savedCount == 1)
-        precondition(reloaded.snapshot()[.deepSeek] == "sk-deepseek-secret")
+        precondition(reloaded.snapshot()[.deepSeek] == "test-deepseek-value")
 
         // Two providers coexist.
         try reloaded.setKey("cc-secret", for: .commandCode)
