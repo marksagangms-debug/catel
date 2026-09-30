@@ -7,12 +7,6 @@ struct CommandCodeUsage: Equatable {
     /// Percent of the plan's monthly credits consumed; `resetAt` is the billing
     /// period end (CommandCode has no monthly rolling window, only a pool).
     let monthly: UsageWindow?
-
-    /// The 5-hour cap throttles a coding session first, so it drives the menu bar
-    /// (same rule as OpenCode Go).
-    var menuBarWindow: UsageWindow? {
-        fiveHour ?? weekly ?? monthly
-    }
 }
 
 enum CommandCodeUsageClient {
@@ -74,14 +68,19 @@ enum CommandCodeUsageClient {
         }
     }
 
-    /// Reads `COMMANDCODE_API_KEY` from `~/.hermes/.env` (where Hermes stores it).
-    /// Only reads the file; never writes it.
+    /// A key saved in Catel Settings wins; otherwise reads `COMMANDCODE_API_KEY`
+    /// from `~/.hermes/.env` (where Hermes stores it). Only reads that file;
+    /// never writes it.
     private static func readAPIKey() throws -> String {
+        if let saved = CredentialVault.shared.key(for: .commandCode) {
+            return saved
+        }
+
         let envPath = FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent(".hermes")
             .appendingPathComponent(".env")
 
-        let hint = "Add COMMANDCODE_API_KEY to ~/.hermes/.env"
+        let hint = "Add COMMANDCODE_API_KEY to ~/.hermes/.env, or save a key in Catel Settings"
 
         guard FileManager.default.fileExists(atPath: envPath.path) else {
             throw UsageClientError.missingCredentials(hint)

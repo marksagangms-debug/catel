@@ -45,16 +45,33 @@ enum CatelToken {
 
 struct PopoverView: View {
     @ObservedObject var monitor: UsageMonitor
+    /// Opens the Settings window (provider API keys). Injected by the hosting
+    /// controller so the popover stays free of window/AppDelegate knowledge.
+    var openSettings: () -> Void = {}
 
     var body: some View {
         VStack(alignment: .leading, spacing: CatelToken.sectionGap) {
             menuBarPicker
-            chatGPTSection
-            cursorSection
-            nousSection
-            deepSeekSection
-            openCodeSection
-            commandCodeSection
+
+            if monitor.isAvailable(.chatGPT) {
+                chatGPTSection
+            }
+            if monitor.isAvailable(.cursor) {
+                cursorSection
+            }
+            if monitor.isAvailable(.hermes) {
+                nousSection
+            }
+            if monitor.isAvailable(.deepSeek) {
+                deepSeekSection
+            }
+            if monitor.isAvailable(.openCode) {
+                openCodeSection
+            }
+            if monitor.isAvailable(.commandCode) {
+                commandCodeSection
+            }
+
             footer
         }
         .padding(CatelToken.contentPadding)
@@ -84,6 +101,7 @@ struct PopoverView: View {
                         provider: provider,
                         index: index,
                         isNoneAvailable: monitor.canHideSlot(at: index),
+                        availableProviders: monitor.availableProviders,
                         onChange: { monitor.setMenuBarSlot($0, at: index) }
                     )
                     .frame(maxWidth: .infinity)
@@ -97,7 +115,14 @@ struct PopoverView: View {
         ProviderSection(
             title: "ChatGPT",
             tag: monitor.chatGPTUsage?.planName?.uppercased() ?? "PLAN",
-            status: monitor.chatGPTStatus
+            status: monitor.chatGPTStatus,
+            accessory: {
+                ChatGPTSessionSelector(
+                    selected: monitor.chatGPTStatusMetric,
+                    accent: CatelToken.chatGPT,
+                    onSelect: monitor.setChatGPTStatusMetric
+                )
+            }
         ) {
             if let usage = monitor.chatGPTUsage {
                 HStack(alignment: .top, spacing: CatelToken.columnGap) {
@@ -146,8 +171,8 @@ struct PopoverView: View {
                         }
                     }
 
-                    if let reset = formatReset(usage.billingCycleEnd) {
-                        MicroText("Cycle resets in \(reset)")
+                    if let reset = formatCycleCaption(usage.billingCycleEnd) {
+                        MicroText(reset)
                     }
                 }
             } else {
@@ -175,7 +200,7 @@ struct PopoverView: View {
         }
     }
 
-    /// Matches the Paper caption shape: "$20.44 of $22.00 left  ·  resets in 29d 6h".
+    /// Matches the Paper caption shape: "$20.44 of $22.00 left  ·  29d 6h".
     private func nousCaption(_ usage: HermesUsage) -> String? {
         var parts: [String] = []
 
@@ -190,7 +215,7 @@ struct PopoverView: View {
         }
 
         if let reset = formatReset(usage.billingCycleEnd) {
-            parts.append("resets in \(reset)")
+            parts.append(reset)
         }
 
         return parts.isEmpty ? nil : parts.joined(separator: "  ·  ")
@@ -218,7 +243,14 @@ struct PopoverView: View {
         ProviderSection(
             title: "OpenCode Go",
             tag: "GO",
-            status: monitor.openCodeStatus
+            status: monitor.openCodeStatus,
+            accessory: {
+                WindowMetricSelector(
+                    selected: monitor.openCodeStatusMetric,
+                    accent: CatelToken.openCode,
+                    onSelect: monitor.setOpenCodeStatusMetric
+                )
+            }
         ) {
             if let usage = monitor.openCodeUsage {
                 HStack(alignment: .top, spacing: CatelToken.columnGap) {
@@ -248,7 +280,14 @@ struct PopoverView: View {
         ProviderSection(
             title: "CommandCode",
             tag: monitor.commandCodeUsage?.planName?.uppercased() ?? "API",
-            status: monitor.commandCodeStatus
+            status: monitor.commandCodeStatus,
+            accessory: {
+                WindowMetricSelector(
+                    selected: monitor.commandCodeStatusMetric,
+                    accent: CatelToken.commandCode,
+                    onSelect: monitor.setCommandCodeStatusMetric
+                )
+            }
         ) {
             if let usage = monitor.commandCodeUsage {
                 HStack(alignment: .top, spacing: CatelToken.columnGap) {
@@ -283,7 +322,28 @@ struct PopoverView: View {
             HStack {
                 MicroText(lastUpdatedText)
 
-                Spacer(minLength: 0)
+                Spacer(minLength: 8)
+
+                Button {
+                    monitor.refreshProviderAvailability()
+                    monitor.refresh()
+                } label: {
+                    Image(systemName: "arrow.clockwise")
+                        .font(.system(size: 10, weight: .medium))
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(CatelToken.textSecondary)
+                .accessibilityLabel("Refresh configured providers")
+
+                Button {
+                    openSettings()
+                } label: {
+                    Image(systemName: "gearshape")
+                        .font(.system(size: 10, weight: .medium))
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(CatelToken.textSecondary)
+                .accessibilityLabel("Catel Settings")
 
                 Button("Quit") {
                     NSApplication.shared.terminate(nil)
@@ -305,12 +365,27 @@ struct PopoverView: View {
 
 // MARK: - Building blocks
 
-/// Section shell: title + tag row, optional stale note under the content.
-private struct ProviderSection<Content: View>: View {
+/// Section shell: title + tag row, optional compact window selector, optional stale note.
+private struct ProviderSection<Content: View, Accessory: View>: View {
     let title: String
     let tag: String
     let status: ProviderStatus
+    @ViewBuilder let accessory: Accessory
     @ViewBuilder let content: Content
+
+    init(
+        title: String,
+        tag: String,
+        status: ProviderStatus,
+        @ViewBuilder accessory: () -> Accessory,
+        @ViewBuilder content: () -> Content
+    ) {
+        self.title = title
+        self.tag = tag
+        self.status = status
+        self.accessory = accessory()
+        self.content = content()
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -322,6 +397,10 @@ private struct ProviderSection<Content: View>: View {
                 Text(tag)
                     .font(.system(size: CatelToken.tagFontSize, weight: .medium))
                     .foregroundStyle(CatelToken.textSecondary)
+
+                Spacer(minLength: 4)
+
+                accessory
             }
 
             content
@@ -331,6 +410,119 @@ private struct ProviderSection<Content: View>: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+extension ProviderSection where Accessory == EmptyView {
+    init(
+        title: String,
+        tag: String,
+        status: ProviderStatus,
+        @ViewBuilder content: () -> Content
+    ) {
+        self.init(
+            title: title,
+            tag: tag,
+            status: status,
+            accessory: { EmptyView() },
+            content: content
+        )
+    }
+}
+
+private struct ChatGPTSessionSelector: View {
+    let selected: ChatGPTSessionWindow
+    let accent: Color
+    let onSelect: (ChatGPTSessionWindow) -> Void
+
+    var body: some View {
+        HStack(spacing: 2) {
+            ForEach(ChatGPTSessionWindow.allCases) { session in
+                Button {
+                    onSelect(session)
+                } label: {
+                    Text(session.shortTitle)
+                        .font(.system(size: 9, weight: .semibold))
+                        .foregroundStyle(
+                            selected == session ? accent : CatelToken.textSecondary
+                        )
+                        .frame(minWidth: 19)
+                        .frame(height: 17)
+                        .background(
+                            RoundedRectangle(cornerRadius: 5, style: .continuous)
+                                .fill(
+                                    selected == session
+                                        ? accent.opacity(0.12)
+                                        : Color.clear
+                                )
+                        )
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Show \(session.title) in the status bar")
+                .accessibilityAddTraits(selected == session ? .isSelected : [])
+            }
+        }
+        .padding(.horizontal, 2)
+        .frame(height: 21)
+        .background(
+            RoundedRectangle(cornerRadius: 7, style: .continuous)
+                .fill(CatelToken.fieldSurface)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 7, style: .continuous)
+                .strokeBorder(CatelToken.fieldBorder, lineWidth: 1)
+        )
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Status bar window")
+    }
+}
+
+private struct WindowMetricSelector: View {
+    let selected: UsageWindowMetric
+    let accent: Color
+    let onSelect: (UsageWindowMetric) -> Void
+
+    var body: some View {
+        HStack(spacing: 2) {
+            ForEach(UsageWindowMetric.allCases) { metric in
+                Button {
+                    onSelect(metric)
+                } label: {
+                    Text(metric.shortTitle)
+                        .font(.system(size: 9, weight: .semibold))
+                        .foregroundStyle(
+                            selected == metric ? accent : CatelToken.textSecondary
+                        )
+                        .frame(minWidth: 19)
+                        .frame(height: 17)
+                        .background(
+                            RoundedRectangle(cornerRadius: 5, style: .continuous)
+                                .fill(
+                                    selected == metric
+                                        ? accent.opacity(0.12)
+                                        : Color.clear
+                                )
+                        )
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Show \(metric.title) in the status bar")
+                .accessibilityAddTraits(selected == metric ? .isSelected : [])
+            }
+        }
+        .padding(.horizontal, 2)
+        .frame(height: 21)
+        .background(
+            RoundedRectangle(cornerRadius: 7, style: .continuous)
+                .fill(CatelToken.fieldSurface)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 7, style: .continuous)
+                .strokeBorder(CatelToken.fieldBorder, lineWidth: 1)
+        )
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Status bar window")
     }
 }
 
@@ -355,6 +547,7 @@ private struct MenuBarSlotPicker: View {
     /// Slot position, used for the accessibility label and the `None` rule.
     let index: Int
     let isNoneAvailable: Bool
+    let availableProviders: [MenuBarProvider]
     let onChange: (MenuBarProvider) -> Void
 
     var body: some View {
@@ -396,6 +589,7 @@ private struct MenuBarSlotPicker: View {
         let menu = SlotMenuFactory.makeMenu(
             selected: provider,
             canHideNone: isNoneAvailable,
+            availableProviders: availableProviders,
             slotIndex: index,
             target: MenuBarSlotTarget.shared,
             action: #selector(MenuBarSlotTarget.select(_:))
@@ -551,7 +745,8 @@ private struct RadioIndicator: View {
     }
 }
 
-/// Two-column meter without a radio, used by ChatGPT windows.
+/// Window meter used by ChatGPT, OpenCode Go, and CommandCode. Multi-window
+/// selection lives only in the compact title selector.
 private struct WindowMeter: View {
     let title: String
     let window: UsageWindow?
@@ -563,6 +758,7 @@ private struct WindowMeter: View {
                 Text(title)
                     .font(.system(size: CatelToken.labelFontSize))
                     .foregroundStyle(CatelToken.textSecondary)
+                    .lineLimit(1)
 
                 Spacer(minLength: 0)
 
@@ -573,10 +769,11 @@ private struct WindowMeter: View {
             }
 
             UsageBar(value: window?.usedPercent ?? 0, color: color)
-
-            MicroText(formatReset(window?.resetAt).map { "resets in \($0)" } ?? "resets unavailable")
+            MicroText(formatResetCaption(window?.resetAt))
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(title), \(window.map { formatPercent($0.usedPercent) } ?? "unavailable")")
     }
 }
 
@@ -672,17 +869,23 @@ final class PopoverTrackingView: NSView {
 final class PopoverViewController: NSViewController {
     private let monitor: UsageMonitor
     private let pointerChanged: (Bool) -> Void
+    private let openSettings: () -> Void
 
-    /// Width fits three slot fields side by side: 3 × 94pt fields + 2 × 8pt gaps
-    /// = 298pt of content, plus the 12pt padding on each side (see `CatelToken`).
+    /// Width leaves enough room for the three slot fields, three usage columns,
+    /// and compact window selectors beside the OpenCode/CommandCode titles.
     /// Height is the measured intrinsic content height (515pt for the six provider
     /// sections) with the same ~60pt headroom the five-section layout used, so
     /// stale/loading notes still fit.
-    static let popoverSize = NSSize(width: 324, height: 575)
+    static let popoverSize = NSSize(width: 360, height: 575)
 
-    init(monitor: UsageMonitor, pointerChanged: @escaping (Bool) -> Void) {
+    init(
+        monitor: UsageMonitor,
+        pointerChanged: @escaping (Bool) -> Void,
+        openSettings: @escaping () -> Void = {}
+    ) {
         self.monitor = monitor
         self.pointerChanged = pointerChanged
+        self.openSettings = openSettings
         super.init(nibName: nil, bundle: nil)
     }
 
@@ -697,7 +900,9 @@ final class PopoverViewController: NSViewController {
         )
         rootView.onPointerChange = pointerChanged
 
-        let hostingView = NSHostingView(rootView: PopoverView(monitor: monitor))
+        let hostingView = NSHostingView(
+            rootView: PopoverView(monitor: monitor, openSettings: openSettings)
+        )
         hostingView.translatesAutoresizingMaskIntoConstraints = false
         rootView.addSubview(hostingView)
 

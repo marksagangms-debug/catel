@@ -69,6 +69,118 @@ func formatBalance(_ amount: Double, currency: String) -> String {
         : String(format: "%@%.2f", symbol, max(amount, 0))
 }
 
+func formatResetCaption(_ date: Date?) -> String {
+    formatReset(date) ?? "unavailable"
+}
+
+func formatCycleCaption(_ date: Date?) -> String? {
+    formatReset(date)
+}
+
+enum ChatGPTSessionWindow: String, CaseIterable, Identifiable {
+    case fiveHour
+    case weekly
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .fiveHour: return "5-hour"
+        case .weekly: return "7-day"
+        }
+    }
+
+    var shortTitle: String {
+        switch self {
+        case .fiveHour: return "5h"
+        case .weekly: return "W"
+        }
+    }
+
+    func window(from usage: ChatGPTUsage?) -> UsageWindow? {
+        guard let usage else { return nil }
+        switch self {
+        case .fiveHour: return usage.primaryWindow
+        case .weekly: return usage.secondaryWindow
+        }
+    }
+
+    func percent(from usage: ChatGPTUsage?) -> Double? {
+        window(from: usage)?.usedPercent
+    }
+
+    func percent(from usage: ChatGPTUsage?, preference: ChatGPTSessionWindow) -> Double? {
+        preference.percent(from: usage)
+            ?? Self.fiveHour.percent(from: usage)
+            ?? Self.weekly.percent(from: usage)
+    }
+}
+
+enum UsageWindowMetric: String, CaseIterable, Identifiable {
+    case fiveHour
+    case weekly
+    case monthly
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .fiveHour: return "5-hour"
+        case .weekly: return "Weekly"
+        case .monthly: return "Monthly"
+        }
+    }
+
+    var shortTitle: String {
+        switch self {
+        case .fiveHour: return "5h"
+        case .weekly: return "W"
+        case .monthly: return "M"
+        }
+    }
+
+    func window(from usage: OpenCodeUsage?) -> UsageWindow? {
+        guard let usage else { return nil }
+        switch self {
+        case .fiveHour: return usage.rolling
+        case .weekly: return usage.weekly
+        case .monthly: return usage.monthly
+        }
+    }
+
+    func window(from usage: CommandCodeUsage?) -> UsageWindow? {
+        guard let usage else { return nil }
+        switch self {
+        case .fiveHour: return usage.fiveHour
+        case .weekly: return usage.weekly
+        case .monthly: return usage.monthly
+        }
+    }
+
+    func percent(from usage: OpenCodeUsage?) -> Double? {
+        window(from: usage)?.usedPercent
+    }
+
+    func percent(from usage: CommandCodeUsage?) -> Double? {
+        window(from: usage)?.usedPercent
+    }
+
+    /// Prefer the chosen window, then use the provider's first available window.
+    func percent(from usage: OpenCodeUsage?, preference: UsageWindowMetric) -> Double? {
+        preference.percent(from: usage)
+            ?? Self.fiveHour.percent(from: usage)
+            ?? Self.weekly.percent(from: usage)
+            ?? Self.monthly.percent(from: usage)
+    }
+
+    func percent(from usage: CommandCodeUsage?, preference: UsageWindowMetric) -> Double? {
+        preference.percent(from: usage)
+            ?? Self.fiveHour.percent(from: usage)
+            ?? Self.weekly.percent(from: usage)
+            ?? Self.monthly.percent(from: usage)
+    }
+}
+
 enum CursorStatusMetric: String, CaseIterable, Identifiable {
     case cursorModels
     case otherModels
@@ -170,6 +282,9 @@ func formatReset(_ date: Date?) -> String? {
 
 final class UsageMonitor: ObservableObject {
     private static let cursorStatusMetricKey = "cursorStatusMetric"
+    private static let chatGPTStatusMetricKey = "chatGPTStatusMetric"
+    private static let openCodeStatusMetricKey = "openCodeStatusMetric"
+    private static let commandCodeStatusMetricKey = "commandCodeStatusMetric"
     private static let menuBarSlotsKey = "menuBarSlots"
 
     static let menuBarSlotCount = 3
@@ -188,10 +303,17 @@ final class UsageMonitor: ObservableObject {
     @Published private(set) var commandCodeStatus: ProviderStatus = .loading
     @Published private(set) var lastUpdated: Date?
     @Published private(set) var cursorStatusMetric: CursorStatusMetric
+    @Published private(set) var chatGPTStatusMetric: ChatGPTSessionWindow
+    @Published private(set) var openCodeStatusMetric: UsageWindowMetric
+    @Published private(set) var commandCodeStatusMetric: UsageWindowMetric
+    /// Providers with readable local credentials. Missing providers stay in the
+    /// configuration, but are hidden from both the detail popover and slot menus.
+    @Published private(set) var providerAvailability: ProviderAvailability
     /// Exactly `menuBarSlotCount` providers, in display order, drive the menu-bar title.
     @Published private(set) var menuBarSlots: [MenuBarProvider]
 
     var onChange: (() -> Void)?
+    var providerAvailabilityDidChange: (() -> Void)?
 
     private var timer: Timer?
     private var pendingRequests = 0
@@ -204,12 +326,63 @@ final class UsageMonitor: ObservableObject {
             cursorStatusMetric = .otherModels
         }
 
+        if let raw = UserDefaults.standard.string(forKey: Self.chatGPTStatusMetricKey),
+           let metric = ChatGPTSessionWindow(rawValue: raw) {
+            chatGPTStatusMetric = metric
+        } else {
+            chatGPTStatusMetric = .fiveHour
+        }
+
+        openCodeStatusMetric = Self.loadWindowMetric(
+            key: Self.openCodeStatusMetricKey,
+            fallback: .fiveHour
+        )
+        commandCodeStatusMetric = Self.loadWindowMetric(
+            key: Self.commandCodeStatusMetricKey,
+            fallback: .fiveHour
+        )
+
+        providerAvailability = ProviderAvailability.make()
         menuBarSlots = Self.loadMenuBarSlots()
 
         refresh()
         timer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
             self?.refresh()
         }
+    }
+
+    var availableProviders: [MenuBarProvider] {
+        providerAvailability.configuredProviders
+    }
+
+    func isAvailable(_ provider: MenuBarProvider) -> Bool {
+        providerAvailability[provider]
+    }
+
+    var visibleMenuBarProviders: [MenuBarProvider] {
+        VisibleMenuBarProviders.resolve(
+            slots: menuBarSlots,
+            availability: providerAvailability
+        )
+    }
+
+    func refreshProviderAvailability() {
+        let updated = ProviderAvailability.make()
+        guard updated.values != providerAvailability.values else { return }
+        providerAvailability = updated
+        providerAvailabilityDidChange?()
+        onChange?()
+    }
+
+    private static func loadWindowMetric(
+        key: String,
+        fallback: UsageWindowMetric
+    ) -> UsageWindowMetric {
+        guard
+            let raw = UserDefaults.standard.string(forKey: key),
+            let metric = UsageWindowMetric(rawValue: raw)
+        else { return fallback }
+        return metric
     }
 
     private static func loadMenuBarSlots() -> [MenuBarProvider] {
@@ -295,6 +468,24 @@ final class UsageMonitor: ObservableObject {
         onChange?()
     }
 
+    func setChatGPTStatusMetric(_ metric: ChatGPTSessionWindow) {
+        chatGPTStatusMetric = metric
+        UserDefaults.standard.set(metric.rawValue, forKey: Self.chatGPTStatusMetricKey)
+        onChange?()
+    }
+
+    func setOpenCodeStatusMetric(_ metric: UsageWindowMetric) {
+        openCodeStatusMetric = metric
+        UserDefaults.standard.set(metric.rawValue, forKey: Self.openCodeStatusMetricKey)
+        onChange?()
+    }
+
+    func setCommandCodeStatusMetric(_ metric: UsageWindowMetric) {
+        commandCodeStatusMetric = metric
+        UserDefaults.standard.set(metric.rawValue, forKey: Self.commandCodeStatusMetricKey)
+        onChange?()
+    }
+
     deinit {
         timer?.invalidate()
     }
@@ -368,7 +559,7 @@ final class UsageMonitor: ObservableObject {
     }
 
     var compactStatus: String {
-        menuBarSlots
+        visibleMenuBarProviders
             .filter { $0 != .none }
             .map { "\($0.label) \(value(for: $0) ?? "--")" }
             .joined(separator: "  ")
@@ -379,7 +570,10 @@ final class UsageMonitor: ObservableObject {
     func value(for provider: MenuBarProvider) -> String? {
         switch provider {
         case .chatGPT:
-            return chatGPTUsage?.primaryWindow.map { formatPercent($0.usedPercent) }
+            return chatGPTStatusMetric.percent(
+                from: chatGPTUsage,
+                preference: chatGPTStatusMetric
+            ).map { formatPercent($0) }
         case .cursor:
             return cursorStatusMetric.percent(from: cursorUsage).map { formatPercent($0) }
         case .hermes:
@@ -387,27 +581,38 @@ final class UsageMonitor: ObservableObject {
         case .deepSeek:
             return deepSeekUsage.map { formatBalance($0.totalBalance, currency: $0.currency) }
         case .openCode:
-            return openCodeUsage?.menuBarWindow.map { formatPercent($0.usedPercent) }
+            return openCodeStatusMetric.percent(
+                from: openCodeUsage,
+                preference: openCodeStatusMetric
+            ).map { formatPercent($0) }
         case .commandCode:
-            return commandCodeUsage?.menuBarWindow.map { formatPercent($0.usedPercent) }
+            return commandCodeStatusMetric.percent(
+                from: commandCodeUsage,
+                preference: commandCodeStatusMetric
+            ).map { formatPercent($0) }
         case .none:
             return nil
         }
     }
 
     var statusSeverity: StatusSeverity {
+        let chatGPTPercent = chatGPTStatusMetric.percent(
+            from: chatGPTUsage,
+            preference: chatGPTStatusMetric
+        ) ?? 0
+        let cursorPercent = cursorStatusMetric.percent(from: cursorUsage) ?? 0
+        let hermesPercent = hermesUsage?.usedPercent ?? 0
+        let openCodePercent = openCodeStatusMetric.percent(
+            from: openCodeUsage,
+            preference: openCodeStatusMetric
+        ) ?? 0
+        let commandCodePercent = commandCodeStatusMetric.percent(
+            from: commandCodeUsage,
+            preference: commandCodeStatusMetric
+        ) ?? 0
         let highest = max(
-            chatGPTUsage?.primaryWindow?.usedPercent ?? 0,
-            max(
-                cursorStatusMetric.percent(from: cursorUsage) ?? 0,
-                max(
-                    hermesUsage?.usedPercent ?? 0,
-                    max(
-                        openCodeUsage?.menuBarWindow?.usedPercent ?? 0,
-                        commandCodeUsage?.menuBarWindow?.usedPercent ?? 0
-                    )
-                )
-            )
+            chatGPTPercent,
+            max(cursorPercent, max(hermesPercent, max(openCodePercent, commandCodePercent)))
         )
 
         if highest >= 90 {
@@ -509,7 +714,25 @@ enum StatusSeverity {
     case critical
 }
 
-/// Providers selectable for the two menu-bar slots. `.none` blanks a slot.
+/// Keeps the configured slot layout intact while hiding providers whose local
+/// credentials disappeared. If that would blank the entire menu bar, the first
+/// available provider temporarily occupies one slot instead.
+enum VisibleMenuBarProviders {
+    static func resolve(
+        slots: [MenuBarProvider],
+        availability: ProviderAvailability
+    ) -> [MenuBarProvider] {
+        let visible = slots.filter { $0 == .none || availability[$0] }
+        guard !visible.contains(where: { $0 != .none }) else { return visible }
+
+        guard let fallback = MenuBarProvider.realProviders.first(where: { availability[$0] }) else {
+            return visible
+        }
+        return [fallback]
+    }
+}
+
+/// Providers selectable for the three menu-bar slots. `.none` blanks a slot.
 enum MenuBarProvider: String, CaseIterable, Identifiable {
     case chatGPT
     case cursor
@@ -543,12 +766,12 @@ enum MenuBarProvider: String, CaseIterable, Identifiable {
 
     var slotTitle: String {
         switch self {
-        case .chatGPT: return "ChatGPT — 5-hour window"
+        case .chatGPT: return "ChatGPT — selected window"
         case .cursor: return "Cursor — selected bucket"
         case .hermes: return "Nous — subscription credits"
         case .deepSeek: return "DeepSeek — balance"
-        case .openCode: return "OpenCode — Go 5-hour window"
-        case .commandCode: return "CommandCode — 5-hour window"
+        case .openCode: return "OpenCode — selected window"
+        case .commandCode: return "CommandCode — selected window"
         case .none: return "None — hidden"
         }
     }

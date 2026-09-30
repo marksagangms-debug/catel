@@ -78,6 +78,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusButton: HoverStatusButton!
     private var popover: NSPopover!
     private var monitor: UsageMonitor!
+    private var settingsController: SettingsWindowController?
 
     private var statusPointerInside = false
     private var popoverPointerInside = false
@@ -92,6 +93,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         monitor = UsageMonitor()
         monitor.onChange = { [weak self] in
+            self?.updateStatusItem()
+        }
+        monitor.providerAvailabilityDidChange = { [weak self] in
             self?.updateStatusItem()
         }
 
@@ -144,6 +148,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             monitor: monitor,
             pointerChanged: { [weak self] isInside in
                 self?.popoverHoverChanged(isInside)
+            },
+            openSettings: { [weak self] in
+                self?.showSettings()
             }
         )
         popover.contentSize = NSSize(width: 300, height: 452)
@@ -168,7 +175,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         // `.none` slots render nothing: dropping them here means no label and no
         // divider for a hidden slot.
-        let segments = monitor.menuBarSlots
+        let segments = monitor.visibleMenuBarProviders
             .filter { $0 != .none }
             .map { provider in
                 (label: provider.label, value: monitor.value(for: provider) ?? "--")
@@ -377,6 +384,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         menu.addItem(.separator())
+
+        // Key entry lives in Settings so the app works without a Hermes/Codex
+        // login on this Mac.
+        let settingsItem = NSMenuItem(
+            title: "Settings…",
+            action: #selector(openSettings(_:)),
+            keyEquivalent: ","
+        )
+        settingsItem.target = self
+        menu.addItem(settingsItem)
+
         let quitItem = NSMenuItem(
             title: "Quit",
             action: #selector(quitApp(_:)),
@@ -401,6 +419,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return SlotMenuFactory.makeMenu(
             selected: current ?? .none,
             canHideNone: monitor.canHideSlot(at: index),
+            availableProviders: monitor.availableProviders,
             slotIndex: index,
             target: self,
             action: #selector(selectSlotProvider(_:))
@@ -425,6 +444,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func quitApp(_ sender: Any?) {
         NSApplication.shared.terminate(nil)
+    }
+
+    @objc private func openSettings(_ sender: Any?) {
+        showSettings()
+    }
+
+    /// The Settings window is built by hand: an `LSUIElement` accessory app owns
+    /// no main menu, so SwiftUI's `Settings` scene has no menu item to open it.
+    private func showSettings() {
+        closePopover()
+
+        let controller: SettingsWindowController
+        if let existing = settingsController {
+            controller = existing
+        } else {
+            let created = SettingsWindowController(monitor: monitor)
+            settingsController = created
+            controller = created
+        }
+
+        NSApp.activate(ignoringOtherApps: true)
+        controller.showWindow(nil)
+        controller.window?.makeKeyAndOrderFront(nil)
     }
 
     private func closeIfClickOutside() {

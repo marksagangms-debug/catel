@@ -8,6 +8,7 @@ enum SlotMenuFactory {
     static func makeMenu(
         selected: MenuBarProvider,
         canHideNone: Bool,
+        availableProviders: [MenuBarProvider],
         slotIndex: Int,
         target: AnyObject,
         action: Selector
@@ -18,7 +19,13 @@ enum SlotMenuFactory {
         // unavailable `None` row look and behave as if it were selectable.
         menu.autoenablesItems = false
 
-        for provider in MenuBarProvider.allCases {
+        let providers = availableProviders.isEmpty
+            ? (availableProviders + [.none])
+            : (availableProviders.contains(selected)
+                ? MenuBarProvider.allCases
+                : availableProviders + [.none])
+
+        for provider in providers {
             let item = NSMenuItem(title: provider.title, action: action, keyEquivalent: "")
             item.target = target
             item.representedObject = provider.rawValue

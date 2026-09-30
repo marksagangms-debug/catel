@@ -4,12 +4,6 @@ struct OpenCodeUsage: Equatable {
     let rolling: UsageWindow?
     let weekly: UsageWindow?
     let monthly: UsageWindow?
-
-    /// The 5-hour rolling window drives the menu-bar value: it is the window that
-    /// throttles a coding session first.
-    var menuBarWindow: UsageWindow? {
-        rolling ?? weekly ?? monthly
-    }
 }
 
 enum OpenCodeUsageClient {
@@ -69,16 +63,21 @@ enum OpenCodeUsageClient {
         }.resume()
     }
 
-    /// Reads the `opencode-go` API key from `~/.local/share/opencode/auth.json`
-    /// (what `opencode providers` / `/connect` writes). Only reads the file.
+    /// A key saved in Catel Settings wins; otherwise reads the `opencode-go` API
+    /// key from `~/.local/share/opencode/auth.json` (what `opencode providers` /
+    /// `/connect` writes). Only reads the file.
     private static func readAPIKey() throws -> String {
+        if let saved = CredentialVault.shared.key(for: .openCode) {
+            return saved
+        }
+
         let authPath = FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent(".local")
             .appendingPathComponent("share")
             .appendingPathComponent("opencode")
             .appendingPathComponent("auth.json")
 
-        let hint = "Connect OpenCode Go in OpenCode (`opencode providers`)"
+        let hint = "Connect OpenCode Go in OpenCode (`opencode providers`), or save a key in Catel Settings"
 
         guard FileManager.default.fileExists(atPath: authPath.path) else {
             throw UsageClientError.missingCredentials(hint)

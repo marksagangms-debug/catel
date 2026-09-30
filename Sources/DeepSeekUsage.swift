@@ -61,26 +61,30 @@ enum DeepSeekUsageClient {
         }.resume()
     }
 
-    /// Reads `DEEPSEEK_API_KEY` from `~/.hermes/.env`.
-    /// Only reads the file; never writes it back.
+    /// A key saved in Catel Settings wins; otherwise reads `DEEPSEEK_API_KEY`
+    /// from `~/.hermes/.env`. Only reads that file; never writes it back.
     private static func readAPIKey() throws -> String {
+        if let saved = CredentialVault.shared.key(for: .deepSeek) {
+            return saved
+        }
+
         let envPath = FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent(".hermes")
             .appendingPathComponent(".env")
 
         guard FileManager.default.fileExists(atPath: envPath.path) else {
-            throw UsageClientError.missingCredentials("Add DEEPSEEK_API_KEY to ~/.hermes/.env")
+            throw UsageClientError.missingCredentials("Add DEEPSEEK_API_KEY to ~/.hermes/.env, or save a key in Catel Settings")
         }
 
         let contents: String
         do {
             contents = try String(contentsOf: envPath, encoding: .utf8)
         } catch {
-            throw UsageClientError.missingCredentials("Add DEEPSEEK_API_KEY to ~/.hermes/.env")
+            throw UsageClientError.missingCredentials("Add DEEPSEEK_API_KEY to ~/.hermes/.env, or save a key in Catel Settings")
         }
 
         guard let key = parseEnvValue(named: "DEEPSEEK_API_KEY", in: contents) else {
-            throw UsageClientError.missingCredentials("Add DEEPSEEK_API_KEY to ~/.hermes/.env")
+            throw UsageClientError.missingCredentials("Add DEEPSEEK_API_KEY to ~/.hermes/.env, or save a key in Catel Settings")
         }
 
         return key

@@ -57,3 +57,75 @@ else
 fi
 
 printf 'Built %s\n' "$APP_BUNDLE"
+
+if [[ "${CATEL_RUN_TESTS:-0}" == "1" ]]; then
+    TEST_BINARY="$BUILD_DIR/provider-availability-tests"
+    swiftc \
+        -swift-version 5 \
+        -framework SwiftUI \
+        -framework AppKit \
+        -framework Combine \
+        "$ROOT_DIR"/Sources/UsageMonitor.swift \
+        "$ROOT_DIR"/Sources/ProviderAvailability.swift \
+        "$ROOT_DIR"/Sources/ProviderCredentials.swift \
+        "$ROOT_DIR"/Sources/ChatGPTUsage.swift \
+        "$ROOT_DIR"/Sources/CursorUsage.swift \
+        "$ROOT_DIR"/Sources/HermesUsage.swift \
+        "$ROOT_DIR"/Sources/DeepSeekUsage.swift \
+        "$ROOT_DIR"/Sources/OpenCodeUsage.swift \
+        "$ROOT_DIR"/Sources/CommandCodeUsage.swift \
+        "$ROOT_DIR"/Tests/ProviderAvailabilityTests.swift \
+        -o "$TEST_BINARY"
+    "$TEST_BINARY"
+    swiftc \
+        -swift-version 5 \
+        -framework SwiftUI \
+        -framework AppKit \
+        -framework Combine \
+        "$ROOT_DIR"/Sources/UsageMonitor.swift \
+        "$ROOT_DIR"/Sources/ProviderAvailability.swift \
+        "$ROOT_DIR"/Sources/ProviderCredentials.swift \
+        "$ROOT_DIR"/Sources/ChatGPTUsage.swift \
+        "$ROOT_DIR"/Sources/CursorUsage.swift \
+        "$ROOT_DIR"/Sources/HermesUsage.swift \
+        "$ROOT_DIR"/Sources/DeepSeekUsage.swift \
+        "$ROOT_DIR"/Sources/OpenCodeUsage.swift \
+        "$ROOT_DIR"/Sources/CommandCodeUsage.swift \
+        "$ROOT_DIR"/Tests/UsageWindowSelectionTests.swift \
+        -o "$BUILD_DIR/usage-window-selection-tests"
+    "$BUILD_DIR/usage-window-selection-tests"
+    swiftc \
+        -swift-version 5 \
+        -framework SwiftUI \
+        -framework AppKit \
+        -framework Combine \
+        "$ROOT_DIR"/Sources/UsageMonitor.swift \
+        "$ROOT_DIR"/Sources/ProviderAvailability.swift \
+        "$ROOT_DIR"/Sources/ProviderCredentials.swift \
+        "$ROOT_DIR"/Sources/ChatGPTUsage.swift \
+        "$ROOT_DIR"/Sources/CursorUsage.swift \
+        "$ROOT_DIR"/Sources/HermesUsage.swift \
+        "$ROOT_DIR"/Sources/DeepSeekUsage.swift \
+        "$ROOT_DIR"/Sources/OpenCodeUsage.swift \
+        "$ROOT_DIR"/Sources/CommandCodeUsage.swift \
+        "$ROOT_DIR"/Tests/VisibleMenuBarProvidersTests.swift \
+        -o "$BUILD_DIR/visible-menu-bar-providers-tests"
+    "$BUILD_DIR/visible-menu-bar-providers-tests"
+    swiftc \
+        -swift-version 5 \
+        -framework SwiftUI \
+        -framework AppKit \
+        -framework Combine \
+        "$ROOT_DIR"/Sources/UsageMonitor.swift \
+        "$ROOT_DIR"/Sources/ProviderAvailability.swift \
+        "$ROOT_DIR"/Sources/ProviderCredentials.swift \
+        "$ROOT_DIR"/Sources/ChatGPTUsage.swift \
+        "$ROOT_DIR"/Sources/CursorUsage.swift \
+        "$ROOT_DIR"/Sources/HermesUsage.swift \
+        "$ROOT_DIR"/Sources/DeepSeekUsage.swift \
+        "$ROOT_DIR"/Sources/OpenCodeUsage.swift \
+        "$ROOT_DIR"/Sources/CommandCodeUsage.swift \
+        "$ROOT_DIR"/Tests/CredentialVaultTests.swift \
+        -o "$BUILD_DIR/credential-vault-tests"
+    "$BUILD_DIR/credential-vault-tests"
+fi
