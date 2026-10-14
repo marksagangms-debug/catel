@@ -16,6 +16,7 @@ enum CatelToken {
 
     // Provider accents: fixed hues that read on light and dark grounds.
     static let chatGPT = Color(red: 0 / 255, green: 122 / 255, blue: 255 / 255)
+    static let claude = Color(red: 217 / 255, green: 119 / 255, blue: 87 / 255)
     static let cursor = Color(red: 88 / 255, green: 86 / 255, blue: 214 / 255)
     static let nous = Color(red: 255 / 255, green: 149 / 255, blue: 0 / 255)
     static let deepSeek = Color(red: 36 / 255, green: 138 / 255, blue: 61 / 255)
@@ -53,22 +54,25 @@ struct PopoverView: View {
         VStack(alignment: .leading, spacing: CatelToken.sectionGap) {
             menuBarPicker
 
-            if monitor.isAvailable(.chatGPT) {
+            if monitor.isShownInPanel(.chatGPT) {
                 chatGPTSection
             }
-            if monitor.isAvailable(.cursor) {
+            if monitor.isShownInPanel(.claude) {
+                claudeSection
+            }
+            if monitor.isShownInPanel(.cursor) {
                 cursorSection
             }
-            if monitor.isAvailable(.hermes) {
+            if monitor.isShownInPanel(.hermes) {
                 nousSection
             }
-            if monitor.isAvailable(.deepSeek) {
+            if monitor.isShownInPanel(.deepSeek) {
                 deepSeekSection
             }
-            if monitor.isAvailable(.openCode) {
+            if monitor.isShownInPanel(.openCode) {
                 openCodeSection
             }
-            if monitor.isAvailable(.commandCode) {
+            if monitor.isShownInPanel(.commandCode) {
                 commandCodeSection
             }
 
@@ -132,13 +136,45 @@ struct PopoverView: View {
                         color: CatelToken.chatGPT
                     )
                     WindowMeter(
-                        title: "7-day",
+                        title: "Weekly",
                         window: usage.secondaryWindow,
                         color: CatelToken.chatGPT
                     )
                 }
             } else {
                 ProviderStateView(status: monitor.chatGPTStatus)
+            }
+        }
+    }
+
+    private var claudeSection: some View {
+        ProviderSection(
+            title: "Claude",
+            tag: monitor.claudeUsage?.planName?.uppercased() ?? "PLAN",
+            status: monitor.claudeStatus,
+            accessory: {
+                ChatGPTSessionSelector(
+                    selected: monitor.claudeStatusMetric,
+                    accent: CatelToken.claude,
+                    onSelect: monitor.setClaudeStatusMetric
+                )
+            }
+        ) {
+            if let usage = monitor.claudeUsage {
+                HStack(alignment: .top, spacing: CatelToken.columnGap) {
+                    WindowMeter(
+                        title: "5-hour",
+                        window: usage.fiveHourWindow,
+                        color: CatelToken.claude
+                    )
+                    WindowMeter(
+                        title: "Weekly",
+                        window: usage.weeklyWindow,
+                        color: CatelToken.claude
+                    )
+                }
+            } else {
+                ProviderStateView(status: monitor.claudeStatus)
             }
         }
     }
@@ -873,10 +909,11 @@ final class PopoverViewController: NSViewController {
 
     /// Width leaves enough room for the three slot fields, three usage columns,
     /// and compact window selectors beside the OpenCode/CommandCode titles.
-    /// Height is the measured intrinsic content height (515pt for the six provider
-    /// sections) with the same ~60pt headroom the five-section layout used, so
-    /// stale/loading notes still fit.
-    static let popoverSize = NSSize(width: 360, height: 575)
+    /// Height follows the content (see `fitToContent`), since Settings can
+    /// switch provider sections off; this is only the initial size.
+    static let popoverSize = NSSize(width: 360, height: 660)
+
+    private var hostingView: NSHostingView<PopoverView>?
 
     init(
         monitor: UsageMonitor,
@@ -905,6 +942,7 @@ final class PopoverViewController: NSViewController {
         )
         hostingView.translatesAutoresizingMaskIntoConstraints = false
         rootView.addSubview(hostingView)
+        self.hostingView = hostingView
 
         NSLayoutConstraint.activate([
             hostingView.leadingAnchor.constraint(equalTo: rootView.leadingAnchor),
@@ -915,5 +953,17 @@ final class PopoverViewController: NSViewController {
 
         view = rootView
         preferredContentSize = Self.popoverSize
+    }
+
+    /// Resizes the popover to the sections currently shown.
+    func fitToContent() {
+        guard let hostingView else { return }
+        hostingView.layoutSubtreeIfNeeded()
+        let height = hostingView.fittingSize.height
+        guard height > 0 else { return }
+        let size = NSSize(width: Self.popoverSize.width, height: ceil(height))
+        if preferredContentSize != size {
+            preferredContentSize = size
+        }
     }
 }

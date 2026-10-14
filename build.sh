@@ -69,6 +69,7 @@ if [[ "${CATEL_RUN_TESTS:-0}" == "1" ]]; then
         "$ROOT_DIR"/Sources/ProviderAvailability.swift \
         "$ROOT_DIR"/Sources/ProviderCredentials.swift \
         "$ROOT_DIR"/Sources/ChatGPTUsage.swift \
+        "$ROOT_DIR"/Sources/ClaudeUsage.swift \
         "$ROOT_DIR"/Sources/CursorUsage.swift \
         "$ROOT_DIR"/Sources/HermesUsage.swift \
         "$ROOT_DIR"/Sources/DeepSeekUsage.swift \
@@ -86,6 +87,7 @@ if [[ "${CATEL_RUN_TESTS:-0}" == "1" ]]; then
         "$ROOT_DIR"/Sources/ProviderAvailability.swift \
         "$ROOT_DIR"/Sources/ProviderCredentials.swift \
         "$ROOT_DIR"/Sources/ChatGPTUsage.swift \
+        "$ROOT_DIR"/Sources/ClaudeUsage.swift \
         "$ROOT_DIR"/Sources/CursorUsage.swift \
         "$ROOT_DIR"/Sources/HermesUsage.swift \
         "$ROOT_DIR"/Sources/DeepSeekUsage.swift \
@@ -103,6 +105,7 @@ if [[ "${CATEL_RUN_TESTS:-0}" == "1" ]]; then
         "$ROOT_DIR"/Sources/ProviderAvailability.swift \
         "$ROOT_DIR"/Sources/ProviderCredentials.swift \
         "$ROOT_DIR"/Sources/ChatGPTUsage.swift \
+        "$ROOT_DIR"/Sources/ClaudeUsage.swift \
         "$ROOT_DIR"/Sources/CursorUsage.swift \
         "$ROOT_DIR"/Sources/HermesUsage.swift \
         "$ROOT_DIR"/Sources/DeepSeekUsage.swift \
@@ -120,6 +123,7 @@ if [[ "${CATEL_RUN_TESTS:-0}" == "1" ]]; then
         "$ROOT_DIR"/Sources/ProviderAvailability.swift \
         "$ROOT_DIR"/Sources/ProviderCredentials.swift \
         "$ROOT_DIR"/Sources/ChatGPTUsage.swift \
+        "$ROOT_DIR"/Sources/ClaudeUsage.swift \
         "$ROOT_DIR"/Sources/CursorUsage.swift \
         "$ROOT_DIR"/Sources/HermesUsage.swift \
         "$ROOT_DIR"/Sources/DeepSeekUsage.swift \

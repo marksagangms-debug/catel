@@ -2,27 +2,28 @@
 
 <img src="Resources/AppIcon-source.png" alt="Catel app icon" width="128" align="right" />
 
-A tiny macOS **menu-bar app** that shows your AI subscription usage at a glance: ChatGPT, Cursor, Nous Portal (Hermes), DeepSeek, OpenCode Go, and CommandCode.
+A tiny macOS **menu-bar app** that shows your AI subscription usage at a glance: ChatGPT, Claude, Cursor, Nous Portal (Hermes), DeepSeek, OpenCode Go, and CommandCode.
 
 No Dock icon. No account, no server, no telemetry. Catel reads the credentials your other tools already stored on your Mac, and for the key-based providers you can paste an API key into its Settings window instead. Either way it calls the vendor APIs directly and prints the numbers in your menu bar.
 
 ```text
-G 20% | C 13% | N 7%
+CG 20% | CR 13% | N 7%
 ```
 
-The three slots are yours to assign, so the bar can show any mix of `G` ChatGPT (selected window), `C` Cursor (selected bucket), `N` Nous subscription credits, `D` DeepSeek balance, `O` OpenCode Go (selected window), and `CC` CommandCode (selected window). The example above is the default layout.
+The three slots are yours to assign, so the bar can show any mix of `CG` ChatGPT (selected window), `C` Claude (selected window), `CR` Cursor (selected bucket), `N` Nous subscription credits, `DS` DeepSeek balance, `OP` OpenCode Go (selected window), and `CC` CommandCode (selected window). The example above is the default layout.
 
 ## Features
 
 - **Menu bar at a glance** -- three configurable slots, plain monospaced text, tinted by macOS for light and dark menu bars.
 - **Hover popover** -- hover the item (or click to pin it) for the detail:
-  - **ChatGPT**: 5-hour and 7-day meters with a compact `5h / W` title selector. The chosen window drives the status bar.
+  - **ChatGPT**: 5-hour and weekly meters with a compact `5h / W` title selector. The chosen window drives the status bar.
+  - **Claude**: 5-hour and weekly meters with the same `5h / W` selector, read from the Claude Code sign-in (Keychain). The chosen window drives the status bar.
   - **Cursor**: Cursor Models and Other Models meters, billing-cycle reset, radio dot to pick which bucket drives the menu bar.
   - **Nous / Hermes**: subscription meter, credits left of the monthly allowance, top-up line when purchased credits exist, cycle reset.
   - **DeepSeek**: account balance (API account, denominated in USD).
   - **OpenCode Go**: 5-hour / weekly / monthly limit meters with compact window selection. The chosen window drives the menu bar.
   - **CommandCode**: 5-hour / weekly rolling caps + monthly plan-credit meter with compact window selection. The chosen window drives the menu bar (plan tag: GOAT, Pro, Max, ...).
-- **Provider API keys in Settings** -- open it from the popover's gear or **Settings…** in the right-click menu. Paste a DeepSeek, CommandCode, or OpenCode Go key and Catel uses that key instead of the file it would otherwise read, so those providers work without Hermes or OpenCode installed. Each row shows whether it is using a saved key or the detected file, and `Save` / `Test` / `Clear` are right there. Keys are stored only in `~/Library/Application Support/Catel/credentials.json` (`0600`, never synced) and are never displayed back. ChatGPT, Cursor, and Nous stay read-only from the apps that own their sessions.
+- **Provider API keys in Settings** -- open it from the popover's gear or **Settings…** in the right-click menu. Paste a DeepSeek, CommandCode, or OpenCode Go key and Catel uses that key instead of the file it would otherwise read, so those providers work without Hermes or OpenCode installed. Each row shows whether it is using a saved key or the detected file, and `Save` / `Test` / `Clear` are right there. Keys are stored only in `~/Library/Application Support/Catel/credentials.json` (`0600`, never synced) and are never displayed back. ChatGPT, Claude, Cursor, and Nous stay read-only from the apps that own their sessions.
 - **Choose what the menu bar shows** -- pick providers per slot from the popover, or right-click the menu bar item for a quick switcher. Providers with no local credentials and no saved key are hidden, while the configured slot choice is preserved. Up to two slots can be hidden.
 - **Polls every 60 seconds** and refreshes on hover when the data is stale.
 - **Fails soft** -- a dead endpoint keeps the last good numbers and marks them stale instead of blanking out.
@@ -81,9 +82,9 @@ CATEL_RUN_TESTS=1 zsh build.sh
 | Click the popover gear (footer) | Opens Settings (provider API keys) |
 | Click anywhere else | Closes the popover |
 
-**Menu bar slots.** The popover's *Menu bar* row has three slot pickers: ChatGPT, Cursor, Nous, DeepSeek, OpenCode, CmdCode, or None (hidden). Providers with no readable local credentials and no saved key are omitted from this menu and their detail sections are hidden, but the saved slot choice is kept. Click the refresh icon in the footer after reconnecting a provider; it will reappear without restarting Catel. At most two slots can be hidden, so on the last visible slot `None` is greyed out and cannot be clicked. Picking a provider that already occupies another slot swaps the two instead of duplicating it. Slot choice and the Cursor bucket are remembered in `UserDefaults`.
+**Menu bar slots.** The popover's *Menu bar* row has three slot pickers: ChatGPT, Claude, Cursor, Nous, DeepSeek, OpenCode, CmdCode, or None (hidden). Providers with no readable local credentials and no saved key are omitted from this menu and their detail sections are hidden, but the saved slot choice is kept. Click the refresh icon in the footer after reconnecting a provider; it will reappear without restarting Catel. At most two slots can be hidden, so on the last visible slot `None` is greyed out and cannot be clicked. Picking a provider that already occupies another slot swaps the two instead of duplicating it. Slot choice and the Cursor bucket are remembered in `UserDefaults`.
 
-**Values shown:** `G` = the selected ChatGPT window (`5h` or `W`, representing the 7-day window), `C` = the Cursor bucket you selected, `N` = Nous subscription credits used this period, `D` = DeepSeek balance in dollars, `O` = the selected OpenCode Go window, `CC` = the selected CommandCode window. The popover's compact `5h / W / M` title selector controls each provider's status-bar window; the matching usage column is display-only. The choice is remembered in `UserDefaults` and updates the status bar immediately.
+**Values shown:** `CG` = the selected ChatGPT window (`5h` or `W`, representing the 7-day window), `C` = the selected Claude window, `CR` = the Cursor bucket you selected, `N` = Nous subscription credits used this period, `DS` = DeepSeek balance in dollars, `OP` = the selected OpenCode Go window, `CC` = the selected CommandCode window. The popover's compact `5h / W / M` title selector controls each provider's status-bar window; the matching usage column is display-only. The choice is remembered in `UserDefaults` and updates the status bar immediately.
 
 ## Credentials and privacy
 
@@ -104,7 +105,7 @@ What Catel does **not** do:
 
 - No telemetry, analytics, crash reporting, or "phone home".
 - No tokens, cookies, or raw auth JSON written to logs or disk.
-- No writes to `~/.codex/auth.json`, `~/.hermes/auth.json`, `~/.hermes/.env`, the OpenCode `auth.json`, or the Cursor database. **Refresh-token writes would log you out**, so Catel only reads.
+- No writes to `~/.codex/auth.json`, `~/.hermes/auth.json`, `~/.hermes/.env`, the OpenCode `auth.json`, or the Cursor database. **Refresh-token writes would log you out**, so Catel only reads. The one exception is the Claude Code sign-in: when its token expires Catel refreshes it and writes it back to Claude Code's Keychain item (and `~/.claude/.credentials.json`), the same way a second `claude` session would, so Claude stays live while Claude Code is idle.
 - No local history of your usage. The only persisted state is the menu bar slot selection and the metric preferences (`UserDefaults`), plus the API keys you deliberately save in Settings.
 
 ### Two caveats worth knowing

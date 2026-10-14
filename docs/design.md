@@ -2,7 +2,7 @@
 
 ## Product feel
 
-Minimal menu-bar utility. Glanceable numbers in the bar; detail only on hover/click. One small Settings window holds provider API keys (added in 1.3); nothing else is configurable.
+Minimal menu-bar utility. Glanceable numbers in the bar; detail only on hover/click. One small Settings window holds hover-panel provider toggles and provider API keys.
 
 ## Status item
 
@@ -20,7 +20,7 @@ G{4px}20% | C{4px}13% | N{4px}7%
 - Plain text only — **no** left border, **no** colored backgrounds/gradients
 - Letter → value spacing: **4px** (`NSKernAttributeName` / kern = 4)
 - Between slots: thin `|` divider at ~40% text opacity, with spaces around it (`" | "`)
-- Slot labels: `G` ChatGPT, `C` Cursor, `N` Nous, `D` DeepSeek, `O` OpenCode, `CC` CommandCode; a `None` slot renders nothing at all (no label, no divider)
+- Slot labels: `CG` ChatGPT, `C` Claude, `CR` Cursor, `N` Nous, `DS` DeepSeek, `OP` OpenCode, `CC` CommandCode; a `None` slot renders nothing at all (no label, no divider)
 - The letter→value gap is the kern on the label's **last character only**, so multi-letter labels stay grouped (`CC 61%`, never `C C61%`)
 - Monospaced system font, 11pt semibold
 - Text is rendered as a **template image** so macOS tints it for light/dark menu bar backgrounds (same mechanism as system status icons)
@@ -43,7 +43,7 @@ recovers from frame-layout events that can omit the initial enter callback.
 
 - Size **360×575**, no system popover animation (`animates = false`). The wider canvas gives the three slot fields and three usage columns enough room while leaving the title selectors compact.
 - SwiftUI content in `NSPopover` inside a `PopoverTrackingView` (which reports pointer enter/exit back to the status item controller)
-- Sections stack top to bottom: **Menu bar** picker, configured provider sections in fixed order (ChatGPT, Cursor, Nous, DeepSeek, OpenCode Go, CommandCode), footer. Providers without readable local credentials are omitted; their saved slot choice is preserved and they return after the footer refresh action.
+- Sections stack top to bottom: **Menu bar** picker, configured provider sections in fixed order (ChatGPT, Claude, Cursor, Nous, DeepSeek, OpenCode Go, CommandCode), footer. Providers without readable local credentials are omitted; their saved slot choice is preserved and they return after the footer refresh action.
 - Design tokens live in `CatelToken` (`PopoverView.swift`) — the exact computed styles from the Paper file “Catel”. Keep them in sync when the design changes.
 
 ### Menu bar section
@@ -58,16 +58,23 @@ recovers from frame-layout events that can omit the initial enter callback.
 ### ChatGPT section
 
 - Title: `ChatGPT` + plan tag (e.g. `PLUS`, fallback `PLAN`)
-- Compact `5h / W` selector at the far right. `W` represents the 7-day window; the selected value drives menu-bar `G` and persists in `UserDefaults`.
-- Columns: **5-hour** | **7-day**, display-only with no radio buttons
+- Compact `5h / W` selector at the far right. `W` represents the 7-day window; the selected value drives menu-bar `CG` and persists in `UserDefaults`.
+- Columns: **5-hour** | **Weekly**, display-only with no radio buttons
 - Each column: label, `%`, thin progress bar, reset countdown (`10m`, `5d 17h`)
 - Bar / `%` color: blue (`#007AFF`)
+
+### Claude section
+
+- Title: `Claude` + plan tag from Claude Code's `subscriptionType` (e.g. `MAX`, `PRO`, fallback `PLAN`)
+- Same compact `5h / W` selector as ChatGPT; drives menu-bar `C`, persisted separately
+- Columns: **5-hour** | **Weekly**, display-only, same shape as ChatGPT
+- Bar / `%` color: Claude orange (`#D97757`)
 
 ### Cursor section
 
 - Title: `Cursor` + plan tag (e.g. `PRO`, fallback `PRO`)
 - Columns: **Cursor Models** | **Other Models** (same two-column layout as ChatGPT)
-- Each column row: label + **radio** grouped on the left, `%` on the far right; tap the column to choose which bucket drives menu-bar `C` (persisted in `UserDefaults`)
+- Each column row: label + **radio** grouped on the left, `%` on the far right; tap the column to choose which bucket drives menu-bar `CR` (persisted in `UserDefaults`)
 - Radio: 9px ring; unselected = gray ring (`#6E6E73` @ 40%); selected = ring + 4px dot in the Cursor accent
 - Bar / `%` color: indigo (`#5856D6`) for both buckets
 - Cycle reset line under the columns: compact countdown only (`30d 8h`)
@@ -89,7 +96,7 @@ recovers from frame-layout events that can omit the initial enter callback.
 
 - Title: `OpenCode Go` + tag `GO`
 - Columns: **5-hour** | **Weekly** | **Monthly**, same label/`%`/bar/reset shape as the ChatGPT windows, three columns instead of two
-- A compact `5h / W / M` segmented selector beside the title is the only selector. The usage columns have no radio buttons. The selected window drives menu-bar `O` and is remembered in `UserDefaults`.
+- A compact `5h / W / M` segmented selector beside the title is the only selector. The usage columns have no radio buttons. The selected window drives menu-bar `OP` and is remembered in `UserDefaults`.
 - The three windows come from OpenCode's Go limits: 5-hour, weekly, and monthly dollar caps, reported as a `%` used per window
 - Bar / `%` color: purple (`#AF52DE`)
 - Column width is about 102pt at the 360pt popover width; compact reset captions fit without the removed `resets in` prefix.
@@ -116,6 +123,9 @@ recovers from frame-layout events that can omit the initial enter callback.
 
 ## Settings panel
 
+- Top section `SHOW IN HOVER PANEL`: one switch per provider. Off removes that provider's section from the hover popover; its menu-bar slot is unaffected. Providers with no credentials are listed but disabled (`Not set up`).
+- The popover height fits whatever sections are shown, so hiding providers shrinks it instead of leaving a gap.
+
 `CatelSettingsView` in a hand-built `NSWindow` (`SettingsWindowController`, "Catel Settings"). Entry points: **Settings…** in the status item's right-click menu and the popover footer gear. Opening it closes the popover first.
 
 - Width **460pt**; content height is measured (`NSHostingView.fittingSize`) and the window content size is set from it, so nothing clips. Current measurement: **616pt** content (648pt window including the title bar).
@@ -126,7 +136,7 @@ recovers from frame-layout events that can omit the initial enter callback.
   - a `SecureField` (placeholder `Paste <Provider> API key`, `Replace saved key` when one exists), then `Save`, `Test`, and `Clear` (Clear only when a key is saved)
   - caption line: `Falls back to <source> · <key name>` on the left, live `Test` result on the right (`Checking…` / `Key works · <detail>` / the client's error message)
   - `Save` is disabled while the field is empty; `Test` needs a saved key or a detected fallback file, and works against whichever source is in effect
-- Read-only section (`READ-ONLY FROM OTHER APPS`): ChatGPT, Cursor, Nous with their source file and `Detected` / `Not found`, plus a note that Nous stays on the local Hermes session because Portal refresh tokens are single-use.
+- Read-only section (`READ-ONLY FROM OTHER APPS`): ChatGPT, Claude, Cursor, Nous with their source file and `Detected` / `Not found`, plus a note that Nous stays on the local Hermes session because Portal refresh tokens are single-use.
 - Footer: the storage path (`~/Library/Application Support/Catel/credentials.json`, owner-only `0600`), a line stating nothing is synced or uploaded, and a **Done** button.
 - Saved keys are never rendered back into the field: after saving, the field clears and the badge changes instead.
 
@@ -135,12 +145,12 @@ recovers from frame-layout events that can omit the initial enter callback.
 - The menu bar keeps exactly three configured slots, but providers without local credentials are hidden from the rendered title and popover without deleting their saved assignment. If reconnecting a provider makes it available again, it reappears in the same slot. A key saved in Settings counts as available.
 - Key entry is deliberately limited to providers that accept a plain API key. ChatGPT/Cursor/Nous stay file-only, and the Read-only list states why, so nobody expects a token paste to work where it cannot.
 - Keys are write-once from the user's side: the panel shows status, never the value.
-- Status bar `C` defaults to **Other Models** (tighter / more actionable), but can switch to **Cursor Models** via the column radio or the right-click menu
-- Popover always shows **both** Cursor buckets; the radio dot marks which one drives `C`
+- Status bar `CR` defaults to **Other Models** (tighter / more actionable), but can switch to **Cursor Models** via the column radio or the right-click menu
+- Popover always shows **both** Cursor buckets; the radio dot marks which one drives `CR`
 - Intentionally **not** showing Cursor `$used / $limit` in the popover (that mixed metrics and confused the UI)
 - Nous **does** show remaining dollars under the percent meter because the Portal is credit-denominated; `%` still matches the menu-bar `N`
 - DeepSeek is a balance, not a quota, so it uses a label/value row instead of a meter
-- ChatGPT, OpenCode Go, and CommandCode use compact title selectors with display-only window columns. Cursor keeps its two-column radio selector because its buckets represent different model categories rather than time windows.
+- ChatGPT, Claude, OpenCode Go, and CommandCode use compact title selectors with display-only window columns. Cursor keeps its two-column radio selector because its buckets represent different model categories rather than time windows.
 - Accessory app (`LSUIElement`): no Dock icon; Quit must live in the popover, the right-click menu, and the Settings window is the only extra window the app can show.
 
 ## When changing UI

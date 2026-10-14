@@ -185,6 +185,7 @@ enum ReadOnlyCredentialSource {
     static func describe(_ provider: MenuBarProvider) -> String? {
         switch provider {
         case .chatGPT: return "~/.codex/auth.json"
+        case .claude: return "Claude Code Keychain login"
         case .cursor: return "Cursor app data (state.vscdb)"
         case .hermes: return "~/.hermes/auth.json"
         case .deepSeek, .openCode, .commandCode, .none: return nil

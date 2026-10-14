@@ -20,7 +20,7 @@ There is no server, database, or cloud backend for this app. It only **reads loc
 App launch
   → UsageMonitor starts (immediate refresh + 60s timer)
   → ProviderAvailability checks credential presence (local files + keys saved in Settings)
-  → ChatGPTUsageClient + CursorUsageClient + HermesUsageClient + DeepSeekUsageClient + OpenCodeUsageClient + CommandCodeUsageClient fetch in parallel
+  → ChatGPTUsageClient + ClaudeUsageClient + CursorUsageClient + HermesUsageClient + DeepSeekUsageClient + OpenCodeUsageClient + CommandCodeUsageClient fetch in parallel
   → Status item title updates (three configured slots, with missing providers hidden)
   → Hover/click shows PopoverView bound to UsageMonitor
   → Right-click → "Settings…" (or the popover footer gear) opens the key panel
@@ -35,6 +35,7 @@ App launch
 | `Sources/ProviderAvailability.swift` | Which providers have credentials (local files and/or saved keys) |
 | `Sources/ProviderCredentials.swift` | `CredentialProvider` (key-based providers) + `CredentialVault` (local-only key store) |
 | `Sources/ChatGPTUsage.swift` | ChatGPT usage fetch + parse |
+| `Sources/ClaudeUsage.swift` | Claude usage fetch + parse (Keychain read via `/usr/bin/security`) |
 | `Sources/CursorUsage.swift` | Cursor token read + usage fetch + parse |
 | `Sources/HermesUsage.swift` | Hermes/Nous Portal token read + account fetch + parse |
 | `Sources/DeepSeekUsage.swift` | DeepSeek API key read (Settings key first) + balance fetch + parse |
@@ -73,9 +74,24 @@ Three providers authenticate with a plain API key, so Catel lets you paste one i
    - `plan_type`
    - `rate_limit.primary_window` → 5-hour meter (`used_percent`, `reset_at`, `limit_window_seconds`)
    - `rate_limit.secondary_window` → 7-day meter
-4. **Menu-bar `G` window:** `UsageMonitor.chatGPTStatusMetric` (`ChatGPTSessionWindow`), persisted as `UserDefaults` key `chatGPTStatusMetric` (default `fiveHour`). The compact `5h / W` title selector is the only control; both window columns are display-only.
+4. **Menu-bar `CG` window:** `UsageMonitor.chatGPTStatusMetric` (`ChatGPTSessionWindow`), persisted as `UserDefaults` key `chatGPTStatusMetric` (default `fiveHour`). The compact `5h / W` title selector is the only control; both window columns are display-only.
 
 Credentials are never written back. A 401/403 surfaces as “sign in again.”
+
+## Claude data path
+
+1. **Auth:** Keychain generic password `Claude Code-credentials` (written by Claude Code), read with `/usr/bin/security find-generic-password -w` off the main thread; falls back to `~/.claude/.credentials.json`
+   - `claudeAiOauth.accessToken`, `claudeAiOauth.expiresAt`, `claudeAiOauth.subscriptionType` (plan tag)
+   - Availability checks the Keychain item **without** `-w`, so the secret is not read just to decide visibility
+   - **Refresh (the one provider Catel renews itself):** when `expiresAt` has passed (60s slack) or the API answers 401/403, Catel exchanges `claudeAiOauth.refreshToken` at `POST https://platform.claude.com/v1/oauth/token` with Claude Code's own client ID and stored `scopes`, exactly as another `claude` process would. Without this, the row broke whenever Claude Code sat idle past the ~8h token lifetime
+   - Write-back: the new `accessToken` / `refreshToken` / `expiresAt` are patched into the Keychain item (`security -i` + `add-generic-password -U … -X <hex>` on stdin, the same command Claude Code uses, so the secret never appears in argv) and into `~/.claude/.credentials.json` if present. Each store is written **only while its stored refresh token is still the one Catel used**, so a concurrent Claude Code refresh always wins; Claude Code re-reads its store, so it picks up the rotated token instead of holding a dead one
+   - At most one refresh attempt per 5 minutes. If the refresh is rejected (and Claude Code hasn't written a fresh token meanwhile), the row shows “Claude sign-in expired: run `claude`, then /login”
+   - Every `security` call has a 10s watchdog, so an unanswered Keychain prompt cannot block the serial Claude queue (and with it every later refresh)
+2. **API:** `GET https://api.anthropic.com/api/oauth/usage` (unofficial; what Claude Code's `/usage` reads)
+   - Headers: `Authorization: Bearer ***`, `anthropic-beta: oauth-2025-04-20`
+3. **Parsed fields:** `five_hour` → 5-hour meter, `seven_day` → 7-day meter (`utilization` is already 0–100, `resets_at` ISO-8601 with microseconds)
+4. **Rate limit:** the endpoint answers HTTP 429 when polled every 60s, so `ClaudeUsageClient` fetches at most every 3 minutes and backs off 6 minutes (or `Retry-After`, if longer) after a 429. In between, it replays the last good result so the section stays `ready`; with no prior data it shows “Claude rate-limited, retrying shortly”
+5. **Menu-bar `C` window:** `UsageMonitor.claudeStatusMetric` (reuses `ChatGPTSessionWindow`), `UserDefaults` key `claudeStatusMetric` (default `fiveHour`)
 
 ## Cursor data path
 
@@ -87,8 +103,8 @@ Credentials are never written back. A 401/403 surfaces as “sign in again.”
    - Body: `{}`
    - Headers include `Authorization: Bearer *** `Connect-Protocol-Version: 1`, and `Cookie: WorkosCursorSessionToken=<sub>%3A%3A<jwt>`
 3. **Parsed `planUsage` fields:**
-   - `autoPercentUsed` → **Cursor Models** (popover; optional menu-bar `C`)
-   - `apiPercentUsed` → **Other Models** (popover; default menu-bar `C`)
+   - `autoPercentUsed` → **Cursor Models** (popover; optional menu-bar `CR`)
+   - `apiPercentUsed` → **Other Models** (popover; default menu-bar `CR`)
    - `totalSpend` / `includedSpend` / `limit` kept on the model but not primary UI
    - `billingCycleEnd` → cycle reset text
 4. **Menu-bar Cursor metric:** `UsageMonitor.cursorStatusMetric` (`CursorStatusMetric`), persisted as `UserDefaults` key `cursorStatusMetric` (default `otherModels`). Changing it calls `onChange` so the status item redraws immediately. Switch via the column radio in the popover or the status-item right-click menu.
@@ -122,7 +138,7 @@ Nous Portal **refresh tokens are single-use**. Calling `POST /api/oauth/token` f
    - Header: `Authorization: Bearer ***
 3. **Parsed fields:**
    - `balance_infos[]` → prefers the `USD` entry, falls back to the first
-   - `total_balance` → menu-bar `D` (`$` formatted)
+   - `total_balance` → menu-bar `DS` (`$` formatted)
    - `granted_balance` / `topped_up_balance` kept on the model
    - `is_available` → drives the “no balance on this account” message
 
@@ -137,7 +153,7 @@ DeepSeek has no percent concept, so it renders as a balance row rather than a me
 3. **Parsed fields:** `usage.rolling` (5-hour), `usage.weekly`, `usage.monthly`
    - each window: `percent` → `% used`, `resetsAt` (ISO-8601) → reset countdown
    - `windowSeconds` is set client-side (5h / 7d / 30d) for reference only
-4. **Menu-bar `O` window:** `UsageMonitor.openCodeStatusMetric` (`UsageWindowMetric`), persisted as `UserDefaults` key `openCodeStatusMetric` (default `fiveHour`). The compact title selector is the only control; the three window columns are display-only. Changing the selector redraws the status item immediately.
+4. **Menu-bar `OP` window:** `UsageMonitor.openCodeStatusMetric` (`UsageWindowMetric`), persisted as `UserDefaults` key `openCodeStatusMetric` (default `fiveHour`). The compact title selector is the only control; the three window columns are display-only. Changing the selector redraws the status item immediately.
 
 ### Important OpenCode caveat
 
@@ -157,17 +173,17 @@ These endpoints are the ones the CommandCode CLI's `/usage` meter reads (`/alpha
 
 ### Unofficial endpoints
 
-Every endpoint used here is **unofficial / undocumented** and can change: ChatGPT `wham/usage`, Cursor `GetCurrentPeriodUsage`, the Nous Portal account API, the OpenCode Go usage endpoint, and the CommandCode `/alpha/billing/*` endpoints. The DeepSeek balance endpoint is documented.
+Every endpoint used here is **unofficial / undocumented** and can change: ChatGPT `wham/usage`, Claude `api/oauth/usage`, Cursor `GetCurrentPeriodUsage`, the Nous Portal account API, the OpenCode Go usage endpoint, and the CommandCode `/alpha/billing/*` endpoints. The DeepSeek balance endpoint is documented.
 
 ## Menu bar slots
 
 - `UsageMonitor.menuBarSlots` holds exactly `UsageMonitor.menuBarSlotCount` (3) `MenuBarProvider` values in display order, persisted as a `UserDefaults` array under `menuBarSlots` (default `[chatGPT, cursor, hermes]`)
-- `MenuBarProvider`: `chatGPT` (`G`), `cursor` (`C`), `hermes` (`N`, titled “Nous”), `deepSeek` (`D`), `openCode` (`O`, titled “OpenCode”), `commandCode` (`CC`, titled “CmdCode”), `none` (hidden)
+- `MenuBarProvider`: `chatGPT` (`CG`), `claude` (`C`), `cursor` (`CR`), `hermes` (`N`, titled “Nous”), `deepSeek` (`DS`), `openCode` (`OP`, titled “OpenCode”), `commandCode` (`CC`, titled “CmdCode”), `none` (hidden)
 - `loadMenuBarSlots()` drops duplicate providers, allows at most `menuBarSlotCount - 1` (2) hidden slots, backfills the rest from real providers, and therefore migrates a store written by the two-slot version without losing it
 - `setMenuBarSlot(_:at:)` swaps when the chosen provider already occupies another slot, so slots stay distinct; `none` is refused when every other slot is already hidden
 - The slot menu is built by `SlotMenuFactory` (`Sources/SlotMenu.swift`) for both the popover picker and the status-item right-click submenus. It sets `autoenablesItems = false`, because AppKit's automatic enabling re-enables any item whose target responds to the action at display time, undoing an explicit `isEnabled = false`. `None` is then simply disabled: AppKit greys it out and refuses the click
 - Quick switching also lives in the status-item right-click menu as one “Menu bar slot N” submenu per slot
-- Values come from `UsageMonitor.value(for:)`: percent for quota providers, `$` balance for DeepSeek, and the selected OpenCode/CommandCode window for `O` / `CC`
+- Values come from `UsageMonitor.value(for:)`: percent for quota providers, `$` balance for DeepSeek, and the selected OpenCode/CommandCode window for `OP` / `CC`
 
 ## Polling & freshness
 
@@ -190,7 +206,7 @@ Reads:
 Writes:
 
 - `~/Library/Application Support/Catel/credentials.json` only, created by `CredentialVault` with `0700` on the directory and `0600` on the file
-- Other persisted state is `UserDefaults`: `menuBarSlots`, plus the metric keys (`cursorStatusMetric`, `chatGPTStatusMetric`, `openCodeStatusMetric`, `commandCodeStatusMetric`)
+- Other persisted state is `UserDefaults`: `menuBarSlots`, `hiddenPanelProviders` (providers switched off for the hover panel; `UsageMonitor.isShownInPanel`), plus the metric keys (`cursorStatusMetric`, `chatGPTStatusMetric`, `claudeStatusMetric`, `openCodeStatusMetric`, `commandCodeStatusMetric`)
 
 ## Error model
 
@@ -211,6 +227,7 @@ Writes:
 - Tokens stay on disk where Codex/Cursor/Hermes already store them; this app only reads them
 - Do not log tokens, cookies, or raw auth JSON
 - Do not write Codex `auth.json`, Hermes `auth.json`, or Cursor DB (refresh-token writes can log the user out)
+- The one exception is Claude Code's OAuth session: Catel refreshes it and writes it back in Claude Code's own format (see *Claude data path*)
 - No telemetry or outbound calls other than the six provider APIs above
 - Do not write the OpenCode `auth.json` either; the Go key is read-only for Catel
 - Do not write `~/.hermes/.env` either; `COMMANDCODE_API_KEY` is read-only for Catel
@@ -218,4 +235,4 @@ Writes:
 
 ## When changing backend behavior
 
-Update this file if you change endpoints, auth sources, key storage or key precedence, which Cursor percentage maps to `C`, Hermes credit math, DeepSeek balance handling, OpenCode Go window handling, CommandCode caps/plan handling, menu bar slots, polling, or packaging.
+Update this file if you change endpoints, auth sources, key storage or key precedence, which Cursor percentage maps to `CR`, Hermes credit math, DeepSeek balance handling, OpenCode Go window handling, CommandCode caps/plan handling, menu bar slots, polling, or packaging.

@@ -28,6 +28,7 @@ struct ProviderAvailability: Equatable {
             at: homeDirectory.appendingPathComponent(".codex/auth.json"),
             providerKeys: ["tokens"]
         )
+        values[.claude] = claudeCredentialsExist(homeDirectory: homeDirectory)
         values[.cursor] = cursorDatabaseExists(homeDirectory: homeDirectory)
         values[.hermes] = validJSONCredential(
             at: homeDirectory.appendingPathComponent(".hermes/auth.json"),
@@ -82,6 +83,18 @@ struct ProviderAvailability: Equatable {
 
         let tokenKeys = ["access_token", "accessToken", "agent_key", "key"]
         return tokenKeys.contains { stringValue(dictionary[$0]) != nil }
+    }
+
+    /// Claude Code's Keychain item (checked without reading the secret) or its
+    /// legacy `~/.claude/.credentials.json`. The Keychain is only consulted for
+    /// the real home directory so tests with a temporary home stay hermetic.
+    private static func claudeCredentialsExist(homeDirectory: URL) -> Bool {
+        let file = homeDirectory.appendingPathComponent(".claude/.credentials.json")
+        if validJSONCredential(at: file, providerKeys: ["claudeAiOauth"]) {
+            return true
+        }
+        guard homeDirectory == FileManager.default.homeDirectoryForCurrentUser else { return false }
+        return ClaudeUsageClient.keychainItemExists()
     }
 
     private static func cursorDatabaseExists(homeDirectory: URL) -> Bool {

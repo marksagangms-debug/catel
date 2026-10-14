@@ -13,7 +13,7 @@ enum KeyTestState: Equatable {
 /// login. Saved keys live only in `CredentialVault`; the read-only providers
 /// keep reading their local files, so the Hermes connection is untouched.
 struct CatelSettingsView: View {
-    let monitor: UsageMonitor
+    @ObservedObject var monitor: UsageMonitor
     let vault: CredentialVault
     let onClose: () -> Void
 
@@ -25,6 +25,8 @@ struct CatelSettingsView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
+            panelSection
+            divider
             header
             keySection
             divider
@@ -38,6 +40,46 @@ struct CatelSettingsView: View {
     }
 
     // MARK: - Sections
+
+    /// On/off per provider for the hover panel. Providers Catel cannot find
+    /// credentials for are listed but disabled, since they never show anyway.
+    private var panelSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Show in hover panel")
+                .font(.system(size: 11, weight: .semibold))
+                .textCase(.uppercase)
+                .tracking(0.6)
+                .foregroundStyle(CatelToken.textSecondary)
+
+            ForEach(MenuBarProvider.realProviders) { provider in
+                let available = monitor.isAvailable(provider)
+                Toggle(isOn: Binding(
+                    get: { available && !monitor.hiddenPanelProviders.contains(provider) },
+                    set: { monitor.setShownInPanel(provider, $0) }
+                )) {
+                    HStack(alignment: .firstTextBaseline, spacing: 6) {
+                        Text(provider.panelTitle)
+                            .font(.system(size: CatelToken.fieldFontSize, weight: .medium))
+                            .foregroundStyle(available ? CatelToken.textPrimary : CatelToken.textSecondary)
+                        if !available {
+                            Text("Not set up")
+                                .font(.system(size: CatelToken.microFontSize))
+                                .foregroundStyle(CatelToken.textSecondary)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .toggleStyle(.switch)
+                .controlSize(.small)
+                .disabled(!available)
+            }
+
+            Text("Hidden providers keep their menu-bar slot; pick slots from the panel itself.")
+                .font(.system(size: CatelToken.microFontSize))
+                .foregroundStyle(CatelToken.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 4) {

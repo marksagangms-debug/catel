@@ -5,6 +5,7 @@
 Catel is a lightweight macOS **menu-bar only** app (no Dock icon). It surfaces usage and balance for:
 
 - **ChatGPT** (Plus/Pro quota via the Codex/ChatGPT local session)
+- **Claude** (Pro/Max 5-hour + weekly limits via the Claude Code sign-in)
 - **Cursor** (Pro plan quotas via Cursor’s local session + dashboard API)
 - **Nous / Hermes Agent** (Nous Portal subscription credits via local Hermes OAuth)
 - **DeepSeek** (API account balance via `DEEPSEEK_API_KEY` in `~/.hermes/.env`, or a key saved in Catel Settings)
@@ -15,22 +16,24 @@ It does **not** track OpenAI developer API spend (`platform.openai.com`). Those 
 
 ## Current features
 
-- Menu bar title built from **three configurable slots**, default `G` (ChatGPT), `C` (Cursor), and `N` (Nous):
-  - `G` = selected ChatGPT window (`5h` or `W` for 7-day) `% used`
-  - `C` = selected Cursor bucket `% used` (default **Other Models**; switch in the popover or right-click menu)
+- Menu bar title built from **three configurable slots**, default `CG` (ChatGPT), `CR` (Cursor), and `N` (Nous):
+  - `CG` = selected ChatGPT window (`5h` or `W` for 7-day) `% used`
+  - `CR` = selected Cursor bucket `% used` (default **Other Models**; switch in the popover or right-click menu)
   - `N` = Nous Portal subscription credits `% used` this billing period
-  - `D` = DeepSeek account balance (`$`)
-  - `O` = selected OpenCode Go window (`5h`, `W`, or `M`) `% used`
+  - `DS` = DeepSeek account balance (`$`)
+  - `OP` = selected OpenCode Go window (`5h`, `W`, or `M`) `% used`
   - `CC` = selected CommandCode window (`5h`, `W`, or `M`) `% used`
   - Slots can be set to **None** (hidden); at most two, so the item never disappears
 - Hover (or click to pin) a compact popover with:
-  - a **Menu bar** row: one picker per slot (ChatGPT / Cursor / Nous / DeepSeek / OpenCode / CmdCode / None)
-  - ChatGPT: 5-hour + 7-day meters, compact `5h / W` title selector, reset times
-  - Cursor: Cursor Models + Other Models meters, billing-cycle reset; radio dot on each column picks which bucket drives `C`
+  - a **Menu bar** row: one picker per slot (ChatGPT / Claude / Cursor / Nous / DeepSeek / OpenCode / CmdCode / None)
+  - ChatGPT: 5-hour + weekly meters, compact `5h / W` title selector, reset times
+  - Claude: same 5-hour + weekly layout and `5h / W` selector (menu-bar label `C`)
+  - Cursor: Cursor Models + Other Models meters, billing-cycle reset; radio dot on each column picks which bucket drives `CR`
   - Nous: subscription meter, remaining `$` of monthly credits, cycle reset; top-up line when purchased credits exist
   - DeepSeek: balance row
   - OpenCode Go: 5-hour + weekly + monthly meters, compact `5h / W / M` title selector, reset times
   - CommandCode: 5-hour + weekly + monthly plan-credit meters, compact `5h / W / M` title selector, plan tag, billing reset
+- **Hover-panel toggles** in Settings: switch each provider's popover section on or off (menu-bar slots unaffected).
 - **Settings window for provider API keys** (1.3): paste a DeepSeek, CommandCode, or OpenCode Go key and Catel uses it instead of the local file, so those providers work without Hermes or OpenCode installed. Each row shows whether it is using a saved key or the detected file, with `Save` / `Test` / `Clear`. Saved keys live only in `~/Library/Application Support/Catel/credentials.json` (`0600`, never synced) and are never shown back. Open from the popover footer gear or **Settings…** in the right-click menu; ChatGPT, Cursor, and Nous stay read-only from their own apps.
 - Polls every **60 seconds**; refreshes on hover if stale
 - **Automatic local credential presence:** providers without readable local credentials (and no saved key) are hidden from the detail popover, slot menus, and rendered menu-bar title. The saved assignment is kept. The footer refresh icon re-checks local files, so a reconnected provider returns without restarting Catel.
@@ -43,6 +46,7 @@ It does **not** track OpenAI developer API spend (`platform.openai.com`). Those 
 - macOS 13+
 - Apple Command Line Tools (`swiftc`) — Xcode app not required
 - Signed in to **Codex/ChatGPT** locally (`~/.codex/auth.json`)
+- Signed in to **Claude Code** (Keychain item `Claude Code-credentials`, or legacy `~/.claude/.credentials.json`)
 - Signed in to **Cursor** on this Mac (token in Cursor `state.vscdb`)
 - Signed in to **Hermes Agent / Nous Portal** locally (`~/.hermes/auth.json`). Hermes must refresh that file (open Hermes occasionally); Catel does **not** rotate the Portal refresh token.
 - Optional, for the three key-based providers: **either** a key saved in Catel Settings **or** the vendor file
@@ -81,6 +85,7 @@ Sources/
   ProviderAvailability.swift # Credential presence (local files + saved keys)
   ProviderCredentials.swift  # Key-based providers + local-only key vault
   ChatGPTUsage.swift   # ChatGPT wham/usage client
+  ClaudeUsage.swift    # Claude oauth/usage client (Claude Code Keychain login)
   CursorUsage.swift    # Cursor dashboard usage client
   HermesUsage.swift    # Nous Portal account/credits client
   DeepSeekUsage.swift  # DeepSeek balance client

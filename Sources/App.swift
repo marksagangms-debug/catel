@@ -94,6 +94,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         monitor = UsageMonitor()
         monitor.onChange = { [weak self] in
             self?.updateStatusItem()
+            self?.fitPopover()
         }
         monitor.providerAvailabilityDidChange = { [weak self] in
             self?.updateStatusItem()
@@ -336,6 +337,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard let statusButton, !popover.isShown else { return }
 
         cancelClose()
+        fitPopover()
         popover.show(
             relativeTo: statusButton.bounds,
             of: statusButton,
@@ -343,6 +345,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
         NSApp.activate(ignoringOtherApps: true)
         popover.contentViewController?.view.window?.makeKey()
+    }
+
+    private func fitPopover() {
+        // Defer one runloop turn so SwiftUI has applied the change first.
+        DispatchQueue.main.async { [weak self] in
+            (self?.popover?.contentViewController as? PopoverViewController)?.fitToContent()
+        }
     }
 
     private func closePopover() {
